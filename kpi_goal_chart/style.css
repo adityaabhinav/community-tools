@@ -1,0 +1,142 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  height: 100vh;
+  margin: 0;
+  background-color: #ffffff;
+  font-family: Optimo-Plain, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  background-color: #ffffff;
+  min-width: 220px;
+  width: 100%;
+}
+
+/* Metric title */
+.kpi-label {
+  font-size: clamp(10px, 1.2vw, 13px);
+  font-weight: 500;
+  color: #777e8b;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+/* Big number */
+.kpi-value {
+  font-size: clamp(28px, 3.5vw, 42px);
+  font-weight: 600;
+  color: #1c2330;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+/* "↑ 92% of goal" line */
+.kpi-progress-indicator {
+  font-size: clamp(12px, 1.3vw, 14px);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.kpi-positive {
+  color: #2e7d32;
+}
+
+.kpi-negative {
+  color: #c62828;
+}
+
+/* Progress bar track */
+.kpi-progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+/* Progress bar fill */
+.kpi-progress-bar-fill {
+  height: 100%;
+  background-color: #1a73e8;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  max-width: 100%;
+}
+
+/* "GOAL: 8,300" */
+.kpi-goal-label {
+  font-size: clamp(10px, 1.1vw, 12px);
+  color: #777e8b;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+  align-self: flex-end;
+}
+
+/* Row of comparison items */
+.kpi-measures {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  width: 100%;
+}
+
+.kpi-comparison-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.comparison-label {
+  font-size: clamp(9px, 1vw, 11px);
+  color: #777e8b;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.kpi-comparison-item .kpi-positive,
+.kpi-comparison-item .kpi-negative {
+  font-size: clamp(12px, 1.3vw, 14px);
+  font-weight: 600;
+}
+
+@media print {
+  body {
+    display: block;
+    width: 100%;
+    height: auto;
+    background-color: #ffffff !important;
+  }
+
+  .kpi-value {
+    font-size: 24px !important;
+    font-weight: 600 !important;
+  }
+
+  .kpi-label,
+  .kpi-goal-label,
+  .comparison-label {
+    font-size: 9px !important;
+  }
+
+  .kpi-progress-indicator,
+  .kpi-comparison-item .kpi-positive,
+  .kpi-comparison-item .kpi-negative {
+    font-size: 10px !important;
+  }
+}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI Goal Chart</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
+</head>
+<body>
+  <div class="kpi-card">
+    <div id="kpiLabel" class="kpi-label"></div>
+    <div id="mainKpiValue" class="kpi-value"></div>
+    <div class="kpi-progress-indicator">
+      <span id="progressIndicator"></span>
+    </div>
+    <div class="kpi-progress-bar-container">
+      <div id="progressBarFill" class="kpi-progress-bar-fill" style="width: 0%"></div>
+    </div>
+    <div id="goalValue" class="kpi-goal-label"></div>
+    <div id="kpiMeasures" class="kpi-measures"></div>
+  </div>
+  <script type="module" src="main.js" defer></script>
+</body>
+</html>

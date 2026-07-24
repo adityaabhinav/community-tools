@@ -1,0 +1,13 @@
+{
+    "defaultLocale": "en_US",
+    "name": "KPI Goal Progress Chart",
+    "description": "KPI chart showing current value vs goal with a progress bar and comparison measures (e.g. MOM, Last Year).",
+    "author": {
+        "name": "ThoughtSpot Community",
+        "email": "community@thoughtspot.com",
+        "org": "ThoughtSpot"
+    },
+    "sourceUrl": "TBD",
+    "iconUrl": "https://cdn-icons-png.flaticon.com/512/1828/1828817.png",
+    "manifestVersion": "v0.1"
+}
