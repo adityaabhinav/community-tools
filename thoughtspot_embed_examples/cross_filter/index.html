@@ -19,26 +19,46 @@
       background: linear-gradient(135deg, #1e40af, #2563eb);
       color: #fff;
       padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
       flex-shrink: 0;
     }
     .header h1 { font-size: 17px; font-weight: 700; }
     .header p  { font-size: 12px; opacity: .75; margin-top: 2px; }
 
-    .status-bar {
+    .toolbar {
       background: #fff;
       border-bottom: 1px solid #e5e7eb;
-      padding: 8px 24px;
-      font-size: 13px;
-      color: #6b7280;
+      padding: 8px 20px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      flex-wrap: wrap;
       flex-shrink: 0;
+      min-height: 44px;
     }
-    #status-dot { font-size: 10px; }
+    #status-text { font-size: 13px; color: #6b7280; }
+
+    .pill {
+      background: #dcfce7;
+      border: 1px solid #86efac;
+      color: #15803d;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+    }
+
+    #clear-btn {
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: none;
+    }
+    #clear-btn:hover { background: #dc2626; }
 
     .embed-wrapper {
       flex: 1;
@@ -49,22 +69,20 @@
       overflow: hidden;
       box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
-
     #ts-embed { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
 
 <div class="header">
-  <div>
-    <h1>ThoughtSpot Liveboard — Cross-Filter Demo</h1>
-    <p>Click any viz to cross-filter other vizs on this liveboard</p>
-  </div>
+  <h1>ThoughtSpot Liveboard — Cross-Filter Demo</h1>
+  <p>Click any viz data point → selection becomes a liveboard filter</p>
 </div>
 
-<div class="status-bar">
-  <span id="status-dot">⏳</span>
-  <span id="status-text">Initialising…</span>
+<div class="toolbar">
+  <span id="status-text">⏳ Initialising…</span>
+  <div id="pills"></div>
+  <button id="clear-btn" onclick="clearFilters()">✕ Clear Filters</button>
 </div>
 
 <div class="embed-wrapper">
@@ -77,42 +95,101 @@
     LiveboardEmbed,
     AuthType,
     EmbedEvent,
+    HostEvent,
+    RuntimeFilterOp,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
   const TS_HOST = 'https://ps-internal.thoughtspot.cloud';
   const LB_ID   = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
 
-  const $dot  = document.getElementById('status-dot');
-  const $text = document.getElementById('status-text');
+  // ── UI helpers ────────────────────────────────────────────────────────────
+  const $status   = document.getElementById('status-text');
+  const $pills    = document.getElementById('pills');
+  const $clearBtn = document.getElementById('clear-btn');
 
-  function setStatus(dot, text) {
-    $dot.textContent  = dot;
-    $text.textContent = text;
+  let activeFilters = [];
+
+  function renderFilters() {
+    $pills.innerHTML = '';
+    activeFilters.forEach(f => {
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.textContent = `${f.columnName} = "${f.values[0]}"`;
+      $pills.appendChild(pill);
+    });
+    $clearBtn.style.display = activeFilters.length ? 'inline-block' : 'none';
   }
 
-  // Initialise — reuses active ThoughtSpot browser session (AuthType.None).
-  // Log in to ps-internal.thoughtspot.cloud first in the same browser.
+  // ── Init ──────────────────────────────────────────────────────────────────
+  // Pre-requisite: be logged into ps-internal.thoughtspot.cloud in this browser.
   await init({
     thoughtSpotHost: TS_HOST,
     authType: AuthType.None,
   });
 
+  // ── Embed ─────────────────────────────────────────────────────────────────
   const embed = new LiveboardEmbed('#ts-embed', {
     liveboardId: LB_ID,
-    fullHeight: true,              // expand to fill the container
-    enableVizTransformations: true, // enables cross-filter interactions
+    fullHeight: true,
+    enableVizTransformations: true,
     frameParams: { width: '100%' },
   });
 
+  // Expose for the clear button (plain onclick, outside module scope)
+  window.__embed = embed;
+
+  // ── VizPointClick → runtime filter on the same liveboard ─────────────────
+  embed.on(EmbedEvent.VizPointClick, (payload) => {
+    try {
+      const point =
+        payload?.data?.clickedPoint ??
+        payload?.clickedPoint ??
+        null;
+
+      if (!point) return;
+
+      const attrs = point.selectedAttributes ?? [];
+      if (attrs.length === 0) {
+        $status.textContent = '⚠️ Clicked point has no dimension — try a bar or table row';
+        return;
+      }
+
+      // Build runtime filters from the clicked attributes
+      activeFilters = attrs.map(attr => ({
+        columnName: attr.name,
+        operator: RuntimeFilterOp.EQ,
+        values: [String(attr.value)],
+      }));
+
+      // Push back into the same liveboard — appears in the filter bar
+      embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
+
+      $status.textContent = `✅ ${activeFilters.length} filter(s) applied to liveboard`;
+      renderFilters();
+
+    } catch (err) {
+      console.error('[cross-filter]', err);
+      $status.textContent = `❌ ${err.message}`;
+    }
+  });
+
   embed
-    .on(EmbedEvent.Load,  () => setStatus('🟢', 'Liveboard loaded — click any chart to cross-filter'))
+    .on(EmbedEvent.Load,  () => {
+      $status.textContent = '🟢 Liveboard loaded — click any chart to filter';
+    })
     .on(EmbedEvent.Error, (e) => {
       console.error('Embed error', e);
-      setStatus('❌', `Error: ${JSON.stringify(e?.data ?? e)}`);
+      $status.textContent = `❌ Embed error — check console`;
     })
     .render();
 
-  setStatus('⏳', 'Loading liveboard…');
+  // ── Clear ─────────────────────────────────────────────────────────────────
+  window.clearFilters = () => {
+    activeFilters = [];
+    window.__embed.trigger(HostEvent.UpdateRuntimeFilters, []);
+    renderFilters();
+    $status.textContent = '🟢 Filters cleared';
+  };
 </script>
 
 </body>
