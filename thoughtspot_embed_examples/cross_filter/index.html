@@ -195,7 +195,7 @@
     <div class="embed-header">
       <div>
         <h2>Embed 1 — Filter Source</h2>
-        <p>Tab: a593d7b5-f6c5-4161-ba04-df13e297a8bc</p>
+        <p>Liveboard: 18222caa-96a7-46c9-bb42-3e9f02822fe2</p>
       </div>
       <span class="badge source">SOURCE</span>
     </div>
@@ -212,7 +212,7 @@
     <div class="embed-header">
       <div>
         <h2>Embed 2 — Filter Target</h2>
-        <p>Tab: 88ce3963-4e1c-40bf-ba7d-c561fba349d4</p>
+        <p>Liveboard: 18222caa-96a7-46c9-bb42-3e9f02822fe2</p>
       </div>
       <span class="badge target">TARGET</span>
     </div>
@@ -248,9 +248,7 @@
 
   // ── Config ────────────────────────────────────────────────────────────────
   const TS_HOST    = 'https://ps-internal.thoughtspot.cloud';
-  const LB_ID      = 'c401702c-d491-4905-8281-545781c1435b';
-  const TAB_1_ID   = 'a593d7b5-f6c5-4161-ba04-df13e297a8bc';
-  const TAB_2_ID   = '88ce3963-4e1c-40bf-ba7d-c561fba349d4';
+  const LB_ID      = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
 
   // ── DOM helpers ───────────────────────────────────────────────────────────
   const $statusIcon    = document.getElementById('status-icon');
@@ -313,16 +311,12 @@
   // ── Embed 1 (source) ──────────────────────────────────────────────────────
   const embed1 = new LiveboardEmbed('#embed1-container', {
     liveboardId: LB_ID,
-    activeTabId: TAB_1_ID,
     frameParams: { height: '580px', width: '100%' },
-    // Allow clicking — do not consume the event internally
-    vizId: undefined,
   });
 
   // ── Embed 2 (target) ──────────────────────────────────────────────────────
   const embed2 = new LiveboardEmbed('#embed2-container', {
     liveboardId: LB_ID,
-    activeTabId: TAB_2_ID,
     frameParams: { height: '580px', width: '100%' },
   });
 
