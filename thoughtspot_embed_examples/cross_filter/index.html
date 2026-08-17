@@ -120,6 +120,7 @@
     AuthType,
     EmbedEvent,
     HostEvent,
+    RuntimeFilterOp,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
   // ── Config — update these to match your ThoughtSpot setup ────────────────
@@ -129,10 +130,11 @@
   // The ThoughtSpot parameter name exactly as it appears in the data model
   const PARAM_NAME = 'Group By';
 
-  // Maps each parameter value → the real ThoughtSpot column name to filter on
+  // Maps each parameter value → the EXACT column name as it appears in the
+  // ThoughtSpot worksheet (check Admin > Data > your worksheet for the name)
   const PARAM_TO_COLUMN = {
-    'Product': 'Product',   // when Group By = Product, filter on column "Product"
-    'Store':   'Store',     // when Group By = Store,   filter on column "Store"
+    'Product': 'Product',   // ← update to exact worksheet column name
+    'Store':   'Store',     // ← update to exact worksheet column name
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -225,17 +227,23 @@
         return;
       }
 
+      const filterPayload = [
+        { columnName: actualColumn, operator: RuntimeFilterOp.EQ, values: [clickedValue] },
+      ];
+
       console.log(
-        `[VizPointClick] Group By param = "${activeParamValue}" → ` +
-        `column = "${actualColumn}", value = "${clickedValue}"`
+        `[VizPointClick] Group By = "${activeParamValue}"  →  ` +
+        `columnName: "${actualColumn}", value: "${clickedValue}"`
       );
+      console.log('[VizPointClick] Sending UpdateRuntimeFilters:', JSON.stringify(filterPayload));
 
-      activeFilters = [{ columnName: actualColumn, operator: 'EQ', values: [clickedValue] }];
+      activeFilters = filterPayload;
 
-      // Apply to the liveboard's global filter bar
-      embed.trigger(HostEvent.UpdateFilters, { filters: activeFilters });
+      // UpdateRuntimeFilters is the confirmed SDK event for pushing filters
+      // into the liveboard filter bar from the host app
+      embed.trigger(HostEvent.UpdateRuntimeFilters, filterPayload);
 
-      $status.textContent = `✅ ${actualColumn} = "${clickedValue}"`;
+      $status.textContent = `✅ Filter applied → ${actualColumn} = "${clickedValue}"`;
       renderFilters();
 
     } catch (err) {
@@ -257,7 +265,7 @@
   // ── Clear ─────────────────────────────────────────────────────────────────
   window.clearFilters = () => {
     activeFilters = [];
-    window.__embed.trigger(HostEvent.UpdateFilters, { filters: [] });
+    window.__embed.trigger(HostEvent.UpdateRuntimeFilters, []);
     renderFilters();
     $status.textContent = `🟢 Filters cleared. Group By is "${activeParamValue}".`;
   };
