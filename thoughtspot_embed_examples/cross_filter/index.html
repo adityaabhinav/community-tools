@@ -232,7 +232,7 @@
 <div class="help">
   <strong>How it works:</strong> The page listens to <code>EmbedEvent.VizPointClick</code> on Embed 1.
   Selected dimension attribute(s) are extracted and pushed to Embed 2 via
-  <code>HostEvent.UpdateFilters</code> — no page reload required.
+  <code>HostEvent.UpdateRuntimeFilters</code> using <code>RuntimeFilterOp.EQ</code> — no page reload required.
   Click <strong>✕ Clear Filters</strong> to reset.
 </div>
 
@@ -243,6 +243,7 @@
     AuthType,
     EmbedEvent,
     HostEvent,
+    RuntimeFilterOp,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
   // ── Config ────────────────────────────────────────────────────────────────
@@ -353,24 +354,24 @@
         return;
       }
 
-      // Build runtime-filter-compatible filter objects
-      const filters = attrs.map(attr => ({
+      // Build runtime filter array — one entry per selected attribute
+      const runtimeFilters = attrs.map(attr => ({
         columnName: attr.name,
-        operator: 'EQ',
+        operator: RuntimeFilterOp.EQ,
         values: [String(attr.value)],
       }));
 
-      console.info('[cross-filter] Applying filters to Embed 2:', filters);
+      console.info('[cross-filter] Applying runtime filters to Embed 2:', runtimeFilters);
 
       // Show brief overlay so the user knows something is happening
       $filterOverlay.style.display = 'flex';
       setTimeout(() => { $filterOverlay.style.display = 'none'; }, 1200);
 
-      // Push filters to Embed 2
-      embed2.trigger(HostEvent.UpdateFilters, { filters, persist: false });
+      // Push runtime filters to Embed 2
+      embed2.trigger(HostEvent.UpdateRuntimeFilters, runtimeFilters);
 
-      setStatus('✅', `Cross-filter applied (${filters.length} attribute${filters.length > 1 ? 's' : ''})`);
-      showFilters(filters);
+      setStatus('✅', `Cross-filter applied (${runtimeFilters.length} attribute${runtimeFilters.length > 1 ? 's' : ''})`);
+      showFilters(runtimeFilters);
 
     } catch (err) {
       console.error('[cross-filter] Error applying filters:', err);
@@ -418,7 +419,7 @@
 
   // ── Clear filters (called by onclick in markup) ───────────────────────────
   window.clearCrossFilters = () => {
-    window.__embed2.trigger(HostEvent.UpdateFilters, { filters: [] });
+    window.__embed2.trigger(HostEvent.UpdateRuntimeFilters, []);
     showFilters([]);
     setStatus('🟢', 'Filters cleared — click any data point in Embed 1');
   };
