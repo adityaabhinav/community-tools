@@ -137,10 +137,46 @@
   // Expose for the clear button (plain onclick, outside module scope)
   window.__embed = embed;
 
-  // ── VizPointClick → global filter on the same liveboard ──────────────────
-  embed.on(EmbedEvent.VizPointClick, (payload) => {
+  // ── Resolve actual column name via ThoughtSpot metadata API ─────────────
+  // A derived/formula column has a display name that differs from the real
+  // source column. We fetch the column metadata using its GUID (attr.id) and
+  // pull `name` from the response, which is the actual underlying column name.
+  async function resolveActualColumnName(columnId) {
     try {
-      // Log full payload so you can inspect the raw structure in DevTools
+      const res = await fetch(
+        `${TS_HOST}/api/rest/2.0/metadata/search`,
+        {
+          method: 'POST',
+          credentials: 'include',           // reuse the active browser session
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            metadata: [{ type: 'LOGICAL_COLUMN', identifier: columnId }],
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        console.warn(`[resolveActualColumnName] API returned ${res.status} for column ${columnId}`);
+        return null;
+      }
+
+      const json = await res.json();
+      console.log(`[resolveActualColumnName] metadata for ${columnId}:`, json);
+
+      // The actual column name is in the first result's header
+      const actual = json?.[0]?.metadata_header?.name ?? null;
+      console.log(`[resolveActualColumnName] actual column name: "${actual}"`);
+      return actual;
+
+    } catch (err) {
+      console.error('[resolveActualColumnName] fetch failed:', err);
+      return null;
+    }
+  }
+
+  // ── VizPointClick → global filter on the same liveboard ──────────────────
+  embed.on(EmbedEvent.VizPointClick, async (payload) => {
+    try {
       console.log('[VizPointClick] raw payload:', payload);
 
       const point =
@@ -158,24 +194,41 @@
       const selectedAttributes = point.selectedAttributes ?? [];
 
       if (selectedAttributes.length === 0) {
-        console.warn('[VizPointClick] selectedAttributes is empty — no dimension to filter on');
+        console.warn('[VizPointClick] selectedAttributes is empty');
         $status.textContent = '⚠️ Clicked point has no dimension attribute — try a bar or table row';
         return;
       }
 
-      // Extract columnName + value from each selected attribute
-      activeFilters = selectedAttributes.map(attr => {
-        const columnName = attr.name;        // column name from the selected parameter
-        const value      = String(attr.value); // value from the click
+      $status.textContent = '⏳ Resolving column names…';
 
-        console.log(`[VizPointClick] captured → columnName: "${columnName}", value: "${value}"`);
+      // For each selected attribute, resolve the ACTUAL column name from its
+      // GUID (attr.id) — this unwraps derived/formula column display names.
+      activeFilters = await Promise.all(
+        selectedAttributes.map(async (attr) => {
+          console.log('[VizPointClick] raw attr:', attr);
 
-        return { columnName, operator: 'EQ', values: [value] };
-      });
+          const displayName = attr.name;           // may be a derived/alias name
+          const columnId    = attr.id;             // GUID of the column
+          const value       = String(attr.value);  // clicked value
+
+          // Try to get the actual column name via metadata API
+          const actualName = columnId
+            ? await resolveActualColumnName(columnId)
+            : null;
+
+          // Fall back to displayName if the API didn't return anything
+          const columnName = actualName ?? displayName;
+
+          console.log(
+            `[VizPointClick] displayName: "${displayName}" | columnId: "${columnId}" | actualName: "${actualName}" | using: "${columnName}" | value: "${value}"`
+          );
+
+          return { columnName, operator: 'EQ', values: [value] };
+        })
+      );
 
       console.log('[VizPointClick] applying to global filter:', activeFilters);
 
-      // Push into the liveboard's own global filter bar
       embed.trigger(HostEvent.UpdateFilters, { filters: activeFilters });
 
       $status.textContent = `✅ Global filter set — ${activeFilters.map(f => `${f.columnName} = "${f.values[0]}"`).join(' | ')}`;
