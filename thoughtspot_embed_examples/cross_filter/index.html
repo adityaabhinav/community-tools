@@ -177,7 +177,7 @@
   <div class="header-icon">⚡</div>
   <div>
     <h1>ThoughtSpot Cross-Filter Demo</h1>
-    <p>Click any data point in Embed 1 — it instantly filters Embed 2</p>
+    <p>Pre-requisite: log in to ps-internal.thoughtspot.cloud first, then open this page</p>
   </div>
 </header>
 
@@ -251,8 +251,6 @@
   const LB_ID      = 'c401702c-d491-4905-8281-545781c1435b';
   const TAB_1_ID   = 'a593d7b5-f6c5-4161-ba04-df13e297a8bc';
   const TAB_2_ID   = '88ce3963-4e1c-40bf-ba7d-c561fba349d4';
-  const USERNAME   = 'Adi111';
-  const PASSWORD   = 'Transs@123';
 
   // ── DOM helpers ───────────────────────────────────────────────────────────
   const $statusIcon    = document.getElementById('status-icon');
@@ -303,9 +301,9 @@
   try {
     await init({
       thoughtSpotHost: TS_HOST,
-      authType: AuthType.Basic,
-      username: USERNAME,
-      password: PASSWORD,
+      authType: AuthType.None,
+      // AuthType.None reuses an active ThoughtSpot browser session.
+      // Log in at https://ps-internal.thoughtspot.cloud before opening this page.
     });
   } catch (e) {
     setStatus('❌', `SDK init failed: ${e.message}`);
