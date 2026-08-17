@@ -96,7 +96,6 @@
     AuthType,
     EmbedEvent,
     HostEvent,
-    RuntimeFilterOp,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
   const TS_HOST = 'https://ps-internal.thoughtspot.cloud';
@@ -154,15 +153,16 @@
         return;
       }
 
-      // Build runtime filters from the clicked attributes
+      // Build filters from the clicked attributes
       activeFilters = attrs.map(attr => ({
         columnName: attr.name,
-        operator: RuntimeFilterOp.EQ,
+        operator: 'EQ',
         values: [String(attr.value)],
       }));
 
-      // Push back into the same liveboard — appears in the filter bar
-      embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
+      // UpdateFilters targets the liveboard's own native filter bar (global),
+      // not a runtime-filter overlay — the chip looks like a user-set filter.
+      embed.trigger(HostEvent.UpdateFilters, { filters: activeFilters });
 
       $status.textContent = `✅ ${activeFilters.length} filter(s) applied to liveboard`;
       renderFilters();
@@ -186,7 +186,7 @@
   // ── Clear ─────────────────────────────────────────────────────────────────
   window.clearFilters = () => {
     activeFilters = [];
-    window.__embed.trigger(HostEvent.UpdateRuntimeFilters, []);
+    window.__embed.trigger(HostEvent.UpdateFilters, { filters: [] });
     renderFilters();
     $status.textContent = '🟢 Filters cleared';
   };
