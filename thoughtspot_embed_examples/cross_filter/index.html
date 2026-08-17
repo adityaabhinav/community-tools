@@ -10,230 +10,65 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f3f4f6;
-      min-height: 100vh;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* ── Header ─────────────────────────────────────────────── */
     .header {
-      background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+      background: linear-gradient(135deg, #1e40af, #2563eb);
       color: #fff;
-      padding: 18px 24px;
+      padding: 14px 24px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.20);
+      gap: 12px;
+      flex-shrink: 0;
     }
-    .header-icon {
-      background: rgba(255,255,255,.18);
-      border-radius: 10px;
-      width: 42px; height: 42px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-    }
-    .header h1 { font-size: 19px; font-weight: 700; }
-    .header p  { font-size: 13px; opacity: .80; margin-top: 2px; }
+    .header h1 { font-size: 17px; font-weight: 700; }
+    .header p  { font-size: 12px; opacity: .75; margin-top: 2px; }
 
-    /* ── Status bar ──────────────────────────────────────────── */
     .status-bar {
       background: #fff;
       border-bottom: 1px solid #e5e7eb;
-      padding: 10px 24px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      min-height: 46px;
-    }
-    .status-icon { font-size: 16px; }
-    #status-text {
+      padding: 8px 24px;
       font-size: 13px;
       color: #6b7280;
-      font-weight: 500;
-    }
-    #filter-pills {
       display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
     }
-    .pill {
-      background: #dcfce7;
-      border: 1px solid #86efac;
-      color: #15803d;
-      border-radius: 99px;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 3px 10px;
-      display: flex; align-items: center; gap: 5px;
-    }
-    .arrow-chip {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #2563eb;
-      border-radius: 99px;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 3px 10px;
-    }
-    #clear-btn {
-      background: #ef4444;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 5px 14px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      display: none;
-      transition: background .15s;
-    }
-    #clear-btn:hover { background: #dc2626; }
+    #status-dot { font-size: 10px; }
 
-    /* ── Two-column embed grid ───────────────────────────────── */
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      padding: 16px;
-    }
-
-    .embed-card {
+    .embed-wrapper {
+      flex: 1;
       background: #fff;
+      margin: 12px;
       border-radius: 10px;
       border: 1px solid #e5e7eb;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
       box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
-    .embed-card.source { border-top: 4px solid #2563eb; }
-    .embed-card.target { border-top: 4px solid #10b981; }
 
-    .embed-header {
-      padding: 13px 16px;
-      border-bottom: 1px solid #e5e7eb;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .embed-header h2 { font-size: 14px; font-weight: 700; color: #111827; }
-    .embed-header p  { font-size: 11.5px; color: #9ca3af; margin-top: 2px; font-family: monospace; }
-
-    .badge {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      padding: 4px 9px;
-      border-radius: 5px;
-      white-space: nowrap;
-    }
-    .badge.source { background: #eff6ff; color: #2563eb; }
-    .badge.target { background: #ecfdf5; color: #059669; }
-
-    .embed-hint {
-      font-size: 12px;
-      padding: 6px 16px;
-      border-bottom: 1px solid #f3f4f6;
-    }
-    .embed-hint.source { background: #eff6ff; color: #3b82f6; }
-    .embed-hint.target { background: #ecfdf5; color: #10b981; }
-
-    .embed-body { flex: 1; }
-    .embed-body > div { width: 100%; height: 580px; }
-
-    /* ── Help footer ─────────────────────────────────────────── */
-    .help {
-      background: #fff;
-      border-top: 1px solid #e5e7eb;
-      padding: 12px 24px;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .help strong { color: #374151; }
-
-    /* ── Loading overlay ─────────────────────────────────────── */
-    .spinner-overlay {
-      position: absolute; inset: 0;
-      background: rgba(255,255,255,.75);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; color: #6b7280; gap: 8px;
-      pointer-events: none;
-      z-index: 5;
-    }
-    .spinner {
-      width: 20px; height: 20px;
-      border: 2px solid #e5e7eb;
-      border-top-color: #2563eb;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    #ts-embed { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
 
-<header class="header">
-  <div class="header-icon">⚡</div>
+<div class="header">
   <div>
-    <h1>ThoughtSpot Cross-Filter Demo</h1>
-    <p>Pre-requisite: log in to ps-internal.thoughtspot.cloud first, then open this page</p>
+    <h1>ThoughtSpot Liveboard — Cross-Filter Demo</h1>
+    <p>Click any viz to cross-filter other vizs on this liveboard</p>
   </div>
-</header>
+</div>
 
 <div class="status-bar">
-  <span class="status-icon" id="status-icon">🔵</span>
-  <span id="status-text">Initialising embeds…</span>
-  <div id="filter-pills"></div>
-  <button id="clear-btn" onclick="clearCrossFilters()">✕ Clear Filters</button>
+  <span id="status-dot">⏳</span>
+  <span id="status-text">Initialising…</span>
 </div>
 
-<div class="grid">
-
-  <!-- Embed 1 — Source -->
-  <div class="embed-card source">
-    <div class="embed-header">
-      <div>
-        <h2>Embed 1 — Filter Source</h2>
-        <p>Liveboard: 18222caa-96a7-46c9-bb42-3e9f02822fe2</p>
-      </div>
-      <span class="badge source">SOURCE</span>
-    </div>
-    <div class="embed-hint source">
-      👆 Click any chart element here to cross-filter Embed 2
-    </div>
-    <div class="embed-body" style="position:relative">
-      <div id="embed1-container"></div>
-    </div>
-  </div>
-
-  <!-- Embed 2 — Target -->
-  <div class="embed-card target">
-    <div class="embed-header">
-      <div>
-        <h2>Embed 2 — Filter Target</h2>
-        <p>Liveboard: 18222caa-96a7-46c9-bb42-3e9f02822fe2</p>
-      </div>
-      <span class="badge target">TARGET</span>
-    </div>
-    <div class="embed-hint target" id="target-hint">
-      ⏳ Waiting for a filter selection from Embed 1…
-    </div>
-    <div class="embed-body" style="position:relative">
-      <div id="embed2-container"></div>
-      <div id="filter-overlay" class="spinner-overlay" style="display:none">
-        <div class="spinner"></div> Applying cross-filter…
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<div class="help">
-  <strong>How it works:</strong> The page listens to <code>EmbedEvent.VizPointClick</code> on Embed 1.
-  Selected dimension attribute(s) are extracted and pushed to Embed 2 via
-  <code>HostEvent.UpdateRuntimeFilters</code> using <code>RuntimeFilterOp.EQ</code> — no page reload required.
-  Click <strong>✕ Clear Filters</strong> to reset.
+<div class="embed-wrapper">
+  <div id="ts-embed"></div>
 </div>
 
 <script type="module">
@@ -242,179 +77,42 @@
     LiveboardEmbed,
     AuthType,
     EmbedEvent,
-    HostEvent,
-    RuntimeFilterOp,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
-  // ── Config ────────────────────────────────────────────────────────────────
-  const TS_HOST    = 'https://ps-internal.thoughtspot.cloud';
-  const LB_ID      = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
+  const TS_HOST = 'https://ps-internal.thoughtspot.cloud';
+  const LB_ID   = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
 
-  // ── DOM helpers ───────────────────────────────────────────────────────────
-  const $statusIcon    = document.getElementById('status-icon');
-  const $statusText    = document.getElementById('status-text');
-  const $filterPills   = document.getElementById('filter-pills');
-  const $clearBtn      = document.getElementById('clear-btn');
-  const $targetHint    = document.getElementById('target-hint');
-  const $filterOverlay = document.getElementById('filter-overlay');
+  const $dot  = document.getElementById('status-dot');
+  const $text = document.getElementById('status-text');
 
-  function setStatus(icon, text) {
-    $statusIcon.textContent = icon;
-    $statusText.textContent = text;
+  function setStatus(dot, text) {
+    $dot.textContent  = dot;
+    $text.textContent = text;
   }
 
-  function showFilters(filters) {
-    $filterPills.innerHTML = '';
-    if (!filters.length) {
-      $clearBtn.style.display = 'none';
-      $targetHint.textContent = '⏳ Waiting for a filter selection from Embed 1…';
-      $targetHint.style.background = '#ecfdf5';
-      $targetHint.style.color = '#10b981';
-      return;
-    }
+  // Initialise — reuses active ThoughtSpot browser session (AuthType.None).
+  // Log in to ps-internal.thoughtspot.cloud first in the same browser.
+  await init({
+    thoughtSpotHost: TS_HOST,
+    authType: AuthType.None,
+  });
 
-    // Arrow chip
-    const arrow = document.createElement('span');
-    arrow.className = 'arrow-chip';
-    arrow.textContent = 'Embed 1 → Embed 2';
-    $filterPills.appendChild(arrow);
-
-    // One pill per filter
-    filters.forEach(f => {
-      const pill = document.createElement('span');
-      pill.className = 'pill';
-      pill.textContent = `${f.columnName} = "${f.values[0]}"`;
-      $filterPills.appendChild(pill);
-    });
-
-    $clearBtn.style.display = 'inline-block';
-    $targetHint.textContent = `✅ ${filters.length} cross-filter(s) applied — showing filtered data`;
-    $targetHint.style.background = '#dcfce7';
-    $targetHint.style.color = '#15803d';
-  }
-
-  // ── Init SDK ──────────────────────────────────────────────────────────────
-  setStatus('⏳', 'Initialising ThoughtSpot SDK…');
-
-  try {
-    await init({
-      thoughtSpotHost: TS_HOST,
-      authType: AuthType.None,
-      // AuthType.None reuses an active ThoughtSpot browser session.
-      // Log in at https://ps-internal.thoughtspot.cloud before opening this page.
-    });
-  } catch (e) {
-    setStatus('❌', `SDK init failed: ${e.message}`);
-    throw e;
-  }
-
-  // ── Embed 1 (source) ──────────────────────────────────────────────────────
-  const embed1 = new LiveboardEmbed('#embed1-container', {
+  const embed = new LiveboardEmbed('#ts-embed', {
     liveboardId: LB_ID,
-    frameParams: { height: '580px', width: '100%' },
+    fullHeight: true,              // expand to fill the container
+    enableVizTransformations: true, // enables cross-filter interactions
+    frameParams: { width: '100%' },
   });
 
-  // ── Embed 2 (target) ──────────────────────────────────────────────────────
-  const embed2 = new LiveboardEmbed('#embed2-container', {
-    liveboardId: LB_ID,
-    frameParams: { height: '580px', width: '100%' },
-  });
+  embed
+    .on(EmbedEvent.Load,  () => setStatus('🟢', 'Liveboard loaded — click any chart to cross-filter'))
+    .on(EmbedEvent.Error, (e) => {
+      console.error('Embed error', e);
+      setStatus('❌', `Error: ${JSON.stringify(e?.data ?? e)}`);
+    })
+    .render();
 
-  // Expose embed2 for the clear-button (called from plain onclick)
-  window.__embed2 = embed2;
-
-  // ── Cross-filter logic ────────────────────────────────────────────────────
-  embed1.on(EmbedEvent.VizPointClick, (payload) => {
-    try {
-      // The SDK wraps the payload differently across versions — normalise both
-      const point =
-        payload?.data?.clickedPoint ||
-        payload?.clickedPoint ||
-        null;
-
-      if (!point) {
-        console.warn('[cross-filter] VizPointClick fired but no clickedPoint found', payload);
-        setStatus('⚠️', 'Click detected but no data point info received');
-        return;
-      }
-
-      const attrs = point.selectedAttributes || [];
-
-      if (attrs.length === 0) {
-        setStatus('⚠️', 'Clicked element has no dimension attributes — cannot cross-filter');
-        console.info('[cross-filter] selectedAttributes is empty', point);
-        return;
-      }
-
-      // Build runtime filter array — one entry per selected attribute
-      const runtimeFilters = attrs.map(attr => ({
-        columnName: attr.name,
-        operator: RuntimeFilterOp.EQ,
-        values: [String(attr.value)],
-      }));
-
-      console.info('[cross-filter] Applying runtime filters to Embed 2:', runtimeFilters);
-
-      // Show brief overlay so the user knows something is happening
-      $filterOverlay.style.display = 'flex';
-      setTimeout(() => { $filterOverlay.style.display = 'none'; }, 1200);
-
-      // Push runtime filters to Embed 2
-      embed2.trigger(HostEvent.UpdateRuntimeFilters, runtimeFilters);
-
-      setStatus('✅', `Cross-filter applied (${runtimeFilters.length} attribute${runtimeFilters.length > 1 ? 's' : ''})`);
-      showFilters(runtimeFilters);
-
-    } catch (err) {
-      console.error('[cross-filter] Error applying filters:', err);
-      setStatus('❌', `Cross-filter error: ${err.message}`);
-    }
-  });
-
-  // Also capture liveboard-level filter bar changes on embed 1
-  embed1.on(EmbedEvent.Filter, (payload) => {
-    try {
-      const filterData = payload?.data ?? payload;
-      if (!filterData) return;
-      console.info('[cross-filter] EmbedEvent.Filter from embed1:', filterData);
-      embed2.trigger(HostEvent.UpdateFilters, filterData);
-    } catch (err) {
-      console.warn('[cross-filter] Filter event forwarding failed:', err);
-    }
-  });
-
-  // ── Status updates on render lifecycle ───────────────────────────────────
-  let rendered1 = false, rendered2 = false;
-
-  function checkReady() {
-    if (rendered1 && rendered2) {
-      setStatus('🟢', 'Both embeds loaded — click any data point in Embed 1');
-    }
-  }
-
-  embed1.on(EmbedEvent.Load, () => { rendered1 = true; checkReady(); });
-  embed2.on(EmbedEvent.Load, () => { rendered2 = true; checkReady(); });
-
-  embed1.on(EmbedEvent.Error, (e) => {
-    console.error('Embed 1 error:', e);
-    setStatus('❌', `Embed 1 error: ${JSON.stringify(e?.data ?? e)}`);
-  });
-  embed2.on(EmbedEvent.Error, (e) => {
-    console.error('Embed 2 error:', e);
-    setStatus('❌', `Embed 2 error: ${JSON.stringify(e?.data ?? e)}`);
-  });
-
-  // ── Render ────────────────────────────────────────────────────────────────
-  setStatus('⏳', 'Rendering embeds…');
-  embed1.render();
-  embed2.render();
-
-  // ── Clear filters (called by onclick in markup) ───────────────────────────
-  window.clearCrossFilters = () => {
-    window.__embed2.trigger(HostEvent.UpdateRuntimeFilters, []);
-    showFilters([]);
-    setStatus('🟢', 'Filters cleared — click any data point in Embed 1');
-  };
+  setStatus('⏳', 'Loading liveboard…');
 </script>
 
 </body>
