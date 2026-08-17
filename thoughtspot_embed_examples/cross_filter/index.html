@@ -30,13 +30,30 @@
       padding: 8px 20px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       flex-wrap: wrap;
       flex-shrink: 0;
-      min-height: 44px;
+      min-height: 46px;
     }
+
+    .toolbar label { font-size: 13px; font-weight: 600; color: #374151; white-space: nowrap; }
+
+    .param-select {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 13px;
+      color: #111827;
+      background: #f9fafb;
+      cursor: pointer;
+    }
+    .param-select:focus { outline: 2px solid #2563eb; }
+
+    .divider { width: 1px; background: #e5e7eb; height: 22px; }
+
     #status-text { font-size: 13px; color: #6b7280; }
 
+    #pills { display: flex; gap: 6px; flex-wrap: wrap; }
     .pill {
       background: #dcfce7;
       border: 1px solid #86efac;
@@ -76,10 +93,17 @@
 
 <div class="header">
   <h1>ThoughtSpot Liveboard — Cross-Filter Demo</h1>
-  <p>Click any viz data point → selection becomes a liveboard filter</p>
+  <p>Click any viz → applies global filter on the actual column behind the Group By parameter</p>
 </div>
 
 <div class="toolbar">
+  <label for="param-select">Group By:</label>
+  <select class="param-select" id="param-select">
+    <option value="Product">Product</option>
+    <option value="Store">Store</option>
+  </select>
+
+  <div class="divider"></div>
   <span id="status-text">⏳ Initialising…</span>
   <div id="pills"></div>
   <button id="clear-btn" onclick="clearFilters()">✕ Clear Filters</button>
@@ -98,15 +122,28 @@
     HostEvent,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
-  const TS_HOST = 'https://ps-internal.thoughtspot.cloud';
-  const LB_ID   = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
+  // ── Config — update these to match your ThoughtSpot setup ────────────────
+  const TS_HOST   = 'https://ps-internal.thoughtspot.cloud';
+  const LB_ID     = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
+
+  // The ThoughtSpot parameter name exactly as it appears in the data model
+  const PARAM_NAME = 'Group By';
+
+  // Maps each parameter value → the real ThoughtSpot column name to filter on
+  const PARAM_TO_COLUMN = {
+    'Product': 'Product',   // when Group By = Product, filter on column "Product"
+    'Store':   'Store',     // when Group By = Store,   filter on column "Store"
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── UI helpers ────────────────────────────────────────────────────────────
-  const $status   = document.getElementById('status-text');
-  const $pills    = document.getElementById('pills');
-  const $clearBtn = document.getElementById('clear-btn');
+  const $status      = document.getElementById('status-text');
+  const $pills       = document.getElementById('pills');
+  const $clearBtn    = document.getElementById('clear-btn');
+  const $paramSelect = document.getElementById('param-select');
 
-  let activeFilters = [];
+  let activeFilters   = [];
+  let activeParamValue = $paramSelect.value;   // tracks current Group By selection
 
   function renderFilters() {
     $pills.innerHTML = '';
@@ -120,10 +157,10 @@
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
-  // Pre-requisite: be logged into ps-internal.thoughtspot.cloud in this browser.
   await init({
     thoughtSpotHost: TS_HOST,
     authType: AuthType.None,
+    // Pre-requisite: be logged into ps-internal.thoughtspot.cloud in this browser
   });
 
   // ── Embed ─────────────────────────────────────────────────────────────────
@@ -134,48 +171,26 @@
     frameParams: { width: '100%' },
   });
 
-  // Expose for the clear button (plain onclick, outside module scope)
   window.__embed = embed;
 
-  // ── Resolve actual column name via ThoughtSpot metadata API ─────────────
-  // A derived/formula column has a display name that differs from the real
-  // source column. We fetch the column metadata using its GUID (attr.id) and
-  // pull `name` from the response, which is the actual underlying column name.
-  async function resolveActualColumnName(columnId) {
-    try {
-      const res = await fetch(
-        `${TS_HOST}/api/rest/2.0/metadata/search`,
-        {
-          method: 'POST',
-          credentials: 'include',           // reuse the active browser session
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            metadata: [{ type: 'LOGICAL_COLUMN', identifier: columnId }],
-          }),
-        }
-      );
+  // ── Parameter dropdown — syncs Group By into the liveboard ───────────────
+  $paramSelect.addEventListener('change', (e) => {
+    activeParamValue = e.target.value;
+    console.log(`[Param] Group By changed to: "${activeParamValue}"`);
 
-      if (!res.ok) {
-        console.warn(`[resolveActualColumnName] API returned ${res.status} for column ${columnId}`);
-        return null;
-      }
+    // Push the new parameter value into the liveboard
+    embed.trigger(HostEvent.UpdateParameters, [
+      { name: PARAM_NAME, value: activeParamValue },
+    ]);
 
-      const json = await res.json();
-      console.log(`[resolveActualColumnName] metadata for ${columnId}:`, json);
+    // Clear any existing global filter since the column has changed
+    activeFilters = [];
+    renderFilters();
+    $status.textContent = `🔄 Group By set to "${activeParamValue}" — click a viz to filter`;
+  });
 
-      // The actual column name is in the first result's header
-      const actual = json?.[0]?.metadata_header?.name ?? null;
-      console.log(`[resolveActualColumnName] actual column name: "${actual}"`);
-      return actual;
-
-    } catch (err) {
-      console.error('[resolveActualColumnName] fetch failed:', err);
-      return null;
-    }
-  }
-
-  // ── VizPointClick → global filter on the same liveboard ──────────────────
-  embed.on(EmbedEvent.VizPointClick, async (payload) => {
+  // ── VizPointClick → resolve actual column → apply global filter ──────────
+  embed.on(EmbedEvent.VizPointClick, (payload) => {
     try {
       console.log('[VizPointClick] raw payload:', payload);
 
@@ -185,53 +200,42 @@
         null;
 
       if (!point) {
-        console.warn('[VizPointClick] clickedPoint not found in payload');
+        console.warn('[VizPointClick] no clickedPoint in payload');
         return;
       }
-
-      console.log('[VizPointClick] clickedPoint:', point);
 
       const selectedAttributes = point.selectedAttributes ?? [];
 
       if (selectedAttributes.length === 0) {
-        console.warn('[VizPointClick] selectedAttributes is empty');
-        $status.textContent = '⚠️ Clicked point has no dimension attribute — try a bar or table row';
+        $status.textContent = '⚠️ No dimension in clicked point — try a bar or table row';
         return;
       }
 
-      $status.textContent = '⏳ Resolving column names…';
+      // The clicked value (what the user selected on the viz)
+      const clickedValue = String(selectedAttributes[0].value);
 
-      // For each selected attribute, resolve the ACTUAL column name from its
-      // GUID (attr.id) — this unwraps derived/formula column display names.
-      activeFilters = await Promise.all(
-        selectedAttributes.map(async (attr) => {
-          console.log('[VizPointClick] raw attr:', attr);
+      // Resolve the REAL column to filter on based on the current parameter value.
+      // e.g. Group By = "Product"  →  filter column "Product"
+      //      Group By = "Store"    →  filter column "Store"
+      const actualColumn = PARAM_TO_COLUMN[activeParamValue];
 
-          const displayName = attr.name;           // may be a derived/alias name
-          const columnId    = attr.id;             // GUID of the column
-          const value       = String(attr.value);  // clicked value
+      if (!actualColumn) {
+        console.warn(`[VizPointClick] No column mapping for param value "${activeParamValue}"`);
+        $status.textContent = `⚠️ No column mapping defined for "${activeParamValue}"`;
+        return;
+      }
 
-          // Try to get the actual column name via metadata API
-          const actualName = columnId
-            ? await resolveActualColumnName(columnId)
-            : null;
-
-          // Fall back to displayName if the API didn't return anything
-          const columnName = actualName ?? displayName;
-
-          console.log(
-            `[VizPointClick] displayName: "${displayName}" | columnId: "${columnId}" | actualName: "${actualName}" | using: "${columnName}" | value: "${value}"`
-          );
-
-          return { columnName, operator: 'EQ', values: [value] };
-        })
+      console.log(
+        `[VizPointClick] Group By param = "${activeParamValue}" → ` +
+        `column = "${actualColumn}", value = "${clickedValue}"`
       );
 
-      console.log('[VizPointClick] applying to global filter:', activeFilters);
+      activeFilters = [{ columnName: actualColumn, operator: 'EQ', values: [clickedValue] }];
 
+      // Apply to the liveboard's global filter bar
       embed.trigger(HostEvent.UpdateFilters, { filters: activeFilters });
 
-      $status.textContent = `✅ Global filter set — ${activeFilters.map(f => `${f.columnName} = "${f.values[0]}"`).join(' | ')}`;
+      $status.textContent = `✅ ${actualColumn} = "${clickedValue}"`;
       renderFilters();
 
     } catch (err) {
@@ -242,11 +246,11 @@
 
   embed
     .on(EmbedEvent.Load,  () => {
-      $status.textContent = '🟢 Liveboard loaded — click any chart to filter';
+      $status.textContent = `🟢 Loaded — Group By is "${activeParamValue}". Click any chart to filter.`;
     })
     .on(EmbedEvent.Error, (e) => {
       console.error('Embed error', e);
-      $status.textContent = `❌ Embed error — check console`;
+      $status.textContent = '❌ Embed error — check console';
     })
     .render();
 
@@ -255,7 +259,7 @@
     activeFilters = [];
     window.__embed.trigger(HostEvent.UpdateFilters, { filters: [] });
     renderFilters();
-    $status.textContent = '🟢 Filters cleared';
+    $status.textContent = `🟢 Filters cleared. Group By is "${activeParamValue}".`;
   };
 </script>
 
