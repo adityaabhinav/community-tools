@@ -137,38 +137,52 @@
   // Expose for the clear button (plain onclick, outside module scope)
   window.__embed = embed;
 
-  // ── VizPointClick → runtime filter on the same liveboard ─────────────────
+  // ── VizPointClick → global filter on the same liveboard ──────────────────
   embed.on(EmbedEvent.VizPointClick, (payload) => {
     try {
+      // Log full payload so you can inspect the raw structure in DevTools
+      console.log('[VizPointClick] raw payload:', payload);
+
       const point =
         payload?.data?.clickedPoint ??
         payload?.clickedPoint ??
         null;
 
-      if (!point) return;
-
-      const attrs = point.selectedAttributes ?? [];
-      if (attrs.length === 0) {
-        $status.textContent = '⚠️ Clicked point has no dimension — try a bar or table row';
+      if (!point) {
+        console.warn('[VizPointClick] clickedPoint not found in payload');
         return;
       }
 
-      // Build filters from the clicked attributes
-      activeFilters = attrs.map(attr => ({
-        columnName: attr.name,
-        operator: 'EQ',
-        values: [String(attr.value)],
-      }));
+      console.log('[VizPointClick] clickedPoint:', point);
 
-      // UpdateFilters targets the liveboard's own native filter bar (global),
-      // not a runtime-filter overlay — the chip looks like a user-set filter.
+      const selectedAttributes = point.selectedAttributes ?? [];
+
+      if (selectedAttributes.length === 0) {
+        console.warn('[VizPointClick] selectedAttributes is empty — no dimension to filter on');
+        $status.textContent = '⚠️ Clicked point has no dimension attribute — try a bar or table row';
+        return;
+      }
+
+      // Extract columnName + value from each selected attribute
+      activeFilters = selectedAttributes.map(attr => {
+        const columnName = attr.name;        // column name from the selected parameter
+        const value      = String(attr.value); // value from the click
+
+        console.log(`[VizPointClick] captured → columnName: "${columnName}", value: "${value}"`);
+
+        return { columnName, operator: 'EQ', values: [value] };
+      });
+
+      console.log('[VizPointClick] applying to global filter:', activeFilters);
+
+      // Push into the liveboard's own global filter bar
       embed.trigger(HostEvent.UpdateFilters, { filters: activeFilters });
 
-      $status.textContent = `✅ ${activeFilters.length} filter(s) applied to liveboard`;
+      $status.textContent = `✅ Global filter set — ${activeFilters.map(f => `${f.columnName} = "${f.values[0]}"`).join(' | ')}`;
       renderFilters();
 
     } catch (err) {
-      console.error('[cross-filter]', err);
+      console.error('[VizPointClick] error:', err);
       $status.textContent = `❌ ${err.message}`;
     }
   });
