@@ -59,12 +59,11 @@
 
         /* ── debug panel ── */
         #debug-panel {
-            position: fixed; bottom: 0; right: 0; width: 420px;
-            max-height: 280px; overflow-y: auto;
+            position: fixed; bottom: 0; right: 0; width: 460px;
+            max-height: 300px; overflow-y: auto;
             background: #1e1e1e; color: #d4d4d4;
             font-family: monospace; font-size: 11px;
             border-top-left-radius: 6px;
-            padding: 0;
             z-index: 9999;
             display: none;
         }
@@ -74,15 +73,13 @@
             background: #333; padding: 6px 10px; position: sticky; top: 0;
             font-size: 11px; font-weight: bold; color: #ccc;
         }
-        #debug-header button {
-            background: none; border: none; color: #aaa; cursor: pointer; font-size: 12px;
-        }
+        #debug-header button { background: none; border: none; color: #aaa; cursor: pointer; font-size: 12px; }
         #debug-log { padding: 6px 10px; }
-        .debug-line { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; }
-        .debug-line .tag { color: #569cd6; margin-right: 4px; }
-        .debug-line .val { color: #ce9178; }
-        .debug-line .ok  { color: #4ec9b0; }
-        .debug-line .warn { color: #dcdcaa; }
+        .dbline { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; word-break: break-all; }
+        .t  { color: #569cd6; margin-right: 4px; }
+        .ok { color: #4ec9b0; }
+        .w  { color: #dcdcaa; }
+        .v  { color: #ce9178; }
         #debug-toggle {
             position: fixed; bottom: 8px; right: 8px;
             background: #333; color: #ccc; border: none; border-radius: 4px;
@@ -100,10 +97,9 @@
 
 <div id="embed-container"></div>
 
-<!-- debug panel (toggle with the button bottom-right) -->
 <div id="debug-panel">
     <div id="debug-header">
-        <span>Debug log</span>
+        <span>Debug log — open browser console for full payloads</span>
         <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
     </div>
     <div id="debug-log"></div>
@@ -121,45 +117,48 @@
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
     // ════════════════════════════════════════════════════════════════════════
-    //  CONFIGURATION — edit these values to match your ThoughtSpot setup
+    //  CONFIGURATION
     // ════════════════════════════════════════════════════════════════════════
 
     const CLUSTER_URL  = 'https://ps-internal.thoughtspot.cloud';
     const LIVEBOARD_ID = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
 
-    // The Action ID set when the custom action was created in ThoughtSpot
-    // (Admin > Custom actions > your action > Action ID field).
-    // Open the Debug panel and click the action — the fired action ID is printed
-    // there. Update this constant to match.
+    // Action ID as configured in ThoughtSpot Admin > Custom Actions
     const CUSTOM_DRILL_ACTION_ID = 'curated-drill-down';
 
-    // ── Group By field configuration ─────────────────────────────────────
-    // If your viz has a formula column that switches between dimensions based
-    // on a parameter (e.g. "if [GroupParam] = 'Region' then [Region] else [Store]"),
-    // set GROUP_BY_COLUMN_NAME to that formula's column name.
+    // ── Group By configuration ────────────────────────────────────────────
     //
-    // When a drill fires on this column the handler will:
-    //   1. Look for another attribute in the same data point whose value
-    //      matches the clicked value → use that column as the filter target.
-    //   2. Fall back to GROUP_BY_PARAM_MAP: map the current parameter value
-    //      to the real column name (set currentGroupByParam below or via the
-    //      dropdown if you add one).
-    //   3. Fall back to filtering on the formula column itself.
+    // When a formula column switches dimensions based on a parameter, e.g.:
+    //   if [GroupByParam] = 'Region' then [Region] else [Store Name] end
     //
-    // Set to null to disable Group By resolution entirely.
-    const GROUP_BY_COLUMN_NAME = null; // e.g. 'Drill Dimension'
+    // The filter rule is:
+    //   filter COLUMN  = current value of the Group By parameter  (e.g. 'Region')
+    //   filter VALUE   = value of the formula column at the clicked point (e.g. 'North')
+    //
+    // Set GROUP_BY_COLUMN_NAME to the exact name of the formula column in the viz.
+    // Set GROUP_BY_PARAM_NAME  to the ThoughtSpot parameter name that drives it.
+    //
+    // If the parameter value IS the same string as the column name you want to
+    // filter on (most common), no further mapping is needed.
+    // If they differ, populate GROUP_BY_PARAM_MAP, e.g.:
+    //   { 'Store': 'Store Name', 'Dept': 'Department Name' }
+    //
+    // Set GROUP_BY_COLUMN_NAME to null to skip Group By logic entirely.
 
-    // Map each possible Group By parameter value → actual ThoughtSpot column name
-    const GROUP_BY_PARAM_MAP = {
-        // 'Region':     'Region',
+    const GROUP_BY_COLUMN_NAME = null;   // e.g. 'Drill Dimension'
+    const GROUP_BY_PARAM_NAME  = null;   // e.g. 'GroupByParam'
+    const GROUP_BY_PARAM_MAP   = {
         // 'Store':      'Store Name',
-        // 'Department': 'Department',
+        // 'Department': 'Department Name',
     };
 
     // ════════════════════════════════════════════════════════════════════════
 
-    let activeFilters        = [];
-    let currentGroupByParam  = null;   // updated when user changes the Group By control
+    let activeFilters       = [];
+    // Holds the current value of the Group By parameter.
+    // Updated automatically from EmbedEvent.LiveboardRendered when
+    // GROUP_BY_PARAM_NAME is configured, or set manually via setGroupByParam().
+    let currentGroupByParam = null;
 
     // ── SDK init ────────────────────────────────────────────────────────────
     init({
@@ -172,145 +171,170 @@
         fullHeight: true,
     });
 
-    // ── Listen for ALL custom actions (not just the target ID) ──────────────
-    // This lets the debug panel show the real action ID even before it's configured.
-    embed.on(EmbedEvent.CustomAction, (payload) => {
-        // Normalise: some SDK versions pass the data directly, others wrap in { data }
-        const raw  = payload?.data ?? payload;
-        const id   = raw?.id ?? raw?.actionId ?? '(unknown)';
-
-        dbg(`CustomAction fired — id: <span class="val">${escapeHtml(id)}</span>`);
-        dbg(`Full payload: <span class="val">${escapeHtml(JSON.stringify(raw, null, 2).slice(0, 600))}</span>`);
-
-        if (id === CUSTOM_DRILL_ACTION_ID) {
-            handleCustomDrill(raw);
-        } else {
-            dbg(`<span class="warn">⚠ Action id "${escapeHtml(id)}" does not match CUSTOM_DRILL_ACTION_ID="${escapeHtml(CUSTOM_DRILL_ACTION_ID)}". Update the constant if this is the right action.</span>`);
+    // ── Track Group By parameter changes ────────────────────────────────────
+    // LiveboardRendered fires on every render (including after a parameter
+    // change inside the liveboard).  We ask ThoughtSpot for current parameters
+    // at that moment so we always know which column to filter on.
+    embed.on(EmbedEvent.LiveboardRendered, async () => {
+        if (!GROUP_BY_PARAM_NAME) return;
+        try {
+            // GetParameters returns { parameters: [{ name, value }, ...] }
+            const resp = await embed.trigger(HostEvent.GetParameters);
+            const params = resp?.parameters ?? resp ?? [];
+            dbg(`LiveboardRendered – params: <span class="v">${escapeHtml(JSON.stringify(params))}</span>`);
+            const p = params.find(p => p.name === GROUP_BY_PARAM_NAME);
+            if (p?.value != null) {
+                currentGroupByParam = String(p.value);
+                dbg(`<span class="ok">Group By param updated → "${escapeHtml(currentGroupByParam)}"</span>`);
+            }
+        } catch (e) {
+            // GetParameters may not be available in all SDK versions; that's fine.
+            dbg(`<span class="w">GetParameters not supported (${escapeHtml(String(e))}). ` +
+                `Set currentGroupByParam manually or use a custom parameter control.</span>`);
         }
     });
 
-    embed.on(EmbedEvent.Error, (e) => {
-        dbg(`<span class="warn">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`);
+    // ── Listen for the custom action ────────────────────────────────────────
+    embed.on(EmbedEvent.CustomAction, (payload) => {
+        // Normalise: some SDK versions pass data directly, others wrap in { data }
+        const raw = payload?.data ?? payload;
+        const id  = raw?.id ?? raw?.actionId ?? '(unknown)';
+
+        dbg(`CustomAction fired — id: <span class="v">${escapeHtml(id)}</span>`);
+        console.log('[custom-drill] Full payload:', raw);
+
+        if (id !== CUSTOM_DRILL_ACTION_ID) {
+            dbg(`<span class="w">⚠ id "${escapeHtml(id)}" ≠ CUSTOM_DRILL_ACTION_ID "${escapeHtml(CUSTOM_DRILL_ACTION_ID)}"</span>`);
+            return;
+        }
+        handleCustomDrill(raw);
     });
 
-    embed.render();
-    dbg('<span class="ok">Embed rendered. Click the custom action on a data point.</span>');
+    embed.on(EmbedEvent.Error, e =>
+        dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
+    );
 
-    // ── Custom drill handler ────────────────────────────────────────────────
+    embed.render();
+    dbg('<span class="ok">Embed rendered — click the custom action on a data point.</span>');
+
+    // ── Custom drill handler ─────────────────────────────────────────────────
     function handleCustomDrill(data) {
         const candidates = extractCandidates(data);
-        dbg(`Candidates extracted: ${escapeHtml(JSON.stringify(candidates))}`);
+        dbg(`Candidates: <span class="v">${escapeHtml(JSON.stringify(candidates))}</span>`);
 
         if (!candidates.length) {
-            dbg('<span class="warn">⚠ No column/value pairs found in payload.</span>');
+            dbg('<span class="w">⚠ No column/value pairs found in payload.</span>');
             return;
         }
 
-        // Resolve each candidate: if it's the Group By formula column, map it
-        // to the actual underlying column.
-        const filters = candidates
-            .map(c => resolveGroupBy(c, candidates))
-            .filter(Boolean)
-            .map(({ columnName, value }) => ({
-                columnName,
-                operator: RuntimeFilterOp.EQ,
-                values: [String(value)],
-            }));
+        const filters = [];
+        for (const candidate of candidates) {
+            const resolved = resolveFilter(candidate, candidates);
+            if (resolved) {
+                filters.push({
+                    columnName: resolved.columnName,
+                    operator:   RuntimeFilterOp.EQ,
+                    values:     [String(resolved.value)],
+                });
+            }
+        }
 
-        dbg(`Applying filters: ${escapeHtml(JSON.stringify(filters))}`);
+        if (!filters.length) {
+            dbg('<span class="w">⚠ No filters resolved.</span>');
+            return;
+        }
+
+        dbg(`Applying: <span class="v">${escapeHtml(JSON.stringify(filters))}</span>`);
         applyFilters(filters);
     }
 
-    // ── Payload extraction ──────────────────────────────────────────────────
-    // Returns [{ columnName, value }, ...] from whichever payload shape is present.
+    // ── Payload extraction ───────────────────────────────────────────────────
     function extractCandidates(data) {
-        const results = [];
+        const out = [];
 
-        // Shape A: context-menu action (right-click on a data point)
+        // Shape A: context-menu (right-click on a data point) — preferred for drill
         const points = data?.contextMenuPoints?.selectedPoints ?? [];
         if (points.length) {
-            const point = points[0];
+            const pt = points[0];
 
-            for (const attr of (point.selectedAttributes ?? [])) {
+            for (const attr of (pt.selectedAttributes ?? [])) {
                 const name = attr?.column?.name ?? attr?.columnName;
                 if (name != null && attr?.value != null) {
-                    results.push({ columnName: name, value: attr.value });
+                    out.push({ columnName: name, value: attr.value });
                 }
             }
 
-            // selectedMeasures can be { "Revenue": 12345 } or an array
-            const measures = point.selectedMeasures;
+            const measures = pt.selectedMeasures;
             if (measures && !Array.isArray(measures)) {
                 for (const [name, value] of Object.entries(measures)) {
-                    results.push({ columnName: name, value });
+                    out.push({ columnName: name, value });
                 }
             } else if (Array.isArray(measures)) {
                 for (const m of measures) {
                     const name = m?.column?.name ?? m?.columnName;
-                    if (name != null && m?.value != null) {
-                        results.push({ columnName: name, value: m.value });
-                    }
+                    if (name != null && m?.value != null) out.push({ columnName: name, value: m.value });
                 }
             }
 
-            if (results.length) return results;
+            if (out.length) return out;
         }
 
-        // Shape B: embedAnswerData (primary / more-options action)
+        // Shape B: full embedAnswerData (primary / more-options action)
         const ans = data?.embedAnswerData;
         if (ans?.columns?.length && ans?.data?.length) {
             const row = ans.data[0];
             ans.columns.forEach((col, i) => {
                 const name = col?.column?.name ?? col?.name;
-                if (name != null && row[i] != null) {
-                    results.push({ columnName: name, value: row[i] });
-                }
+                if (name != null && row[i] != null) out.push({ columnName: name, value: row[i] });
             });
         }
 
-        return results;
+        return out;
     }
 
-    // ── Group By resolution ─────────────────────────────────────────────────
-    // If the candidate column is the configured Group By formula column, resolve
-    // it to the actual underlying column to filter on.
-    function resolveGroupBy({ columnName, value }, allCandidates) {
+    // ── Group By resolution ──────────────────────────────────────────────────
+    // For a "Group By" formula column the rule is:
+    //   filter COLUMN = the Group By parameter's current value  (= the chosen dimension)
+    //   filter VALUE  = the clicked formula value               (= the dimension member)
+    function resolveFilter({ columnName, value }, allCandidates) {
         if (!GROUP_BY_COLUMN_NAME || columnName !== GROUP_BY_COLUMN_NAME) {
-            // Not a Group By column — use as-is
+            // Regular column — use as-is
             return { columnName, value };
         }
 
-        // Method 1: find another attribute in the SAME data point whose value
-        // equals the formula value.  Works when the underlying column is also
-        // included in the search.
-        const valueStr = String(value);
+        // ── Group By column ──────────────────────────────────────────────────
+
+        // Method 1: we know the current parameter value
+        if (currentGroupByParam) {
+            // The parameter value might directly be the column name, or there
+            // might be a mapping entry for it.
+            const col = GROUP_BY_PARAM_MAP[currentGroupByParam] ?? currentGroupByParam;
+            dbg(`<span class="ok">Group By resolved via param "${escapeHtml(currentGroupByParam)}" → col="${escapeHtml(col)}", val="${escapeHtml(String(value))}"</span>`);
+            return { columnName: col, value };
+        }
+
+        // Method 2: smart value-match — find another attribute in the same data
+        // point that has the identical value (works when the underlying dimension
+        // column is also present in the search).
         const match = allCandidates.find(c =>
             c.columnName !== GROUP_BY_COLUMN_NAME &&
-            String(c.value) === valueStr
+            String(c.value) === String(value)
         );
         if (match) {
-            dbg(`<span class="ok">Group By resolved via value-match → ${escapeHtml(match.columnName)} = ${escapeHtml(valueStr)}</span>`);
+            dbg(`<span class="ok">Group By value-matched → col="${escapeHtml(match.columnName)}", val="${escapeHtml(String(value))}"</span>`);
             return { columnName: match.columnName, value };
         }
 
-        // Method 2: use the parameter→column map and the currently tracked param.
-        if (currentGroupByParam && GROUP_BY_PARAM_MAP[currentGroupByParam]) {
-            const resolvedCol = GROUP_BY_PARAM_MAP[currentGroupByParam];
-            dbg(`<span class="ok">Group By resolved via param map (${escapeHtml(currentGroupByParam)}) → ${escapeHtml(resolvedCol)} = ${escapeHtml(valueStr)}</span>`);
-            return { columnName: resolvedCol, value };
-        }
-
-        // Fallback: filter on the formula column itself.
-        dbg(`<span class="warn">⚠ Group By column could not be resolved to an underlying column. Filtering on formula column "${escapeHtml(columnName)}" directly. Configure GROUP_BY_PARAM_MAP or ensure the underlying column is in the search.</span>`);
+        // Fallback — can't resolve; filter on the formula column itself
+        dbg(`<span class="w">⚠ Group By column could not be resolved. Set GROUP_BY_PARAM_NAME so the param is tracked automatically, or call setGroupByParam("Region") from the console.</span>`);
         return { columnName, value };
     }
 
-    // ── Filter management ───────────────────────────────────────────────────
+    // ── Filter management ────────────────────────────────────────────────────
     function applyFilters(newFilters) {
         newFilters.forEach(f => {
-            const idx = activeFilters.findIndex(a => a.columnName === f.columnName);
-            if (idx >= 0) activeFilters[idx] = f;
-            else activeFilters.push(f);
+            const i = activeFilters.findIndex(a => a.columnName === f.columnName);
+            if (i >= 0) activeFilters[i] = f; else activeFilters.push(f);
         });
         embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
         renderFilterBar();
@@ -328,15 +352,18 @@
         renderFilterBar();
     };
 
+    // Manual override — call from browser console when auto-detection isn't available:
+    //   setGroupByParam('Region')
+    window.setGroupByParam = function (val) {
+        currentGroupByParam = val;
+        dbg(`<span class="ok">currentGroupByParam manually set to "${escapeHtml(val)}"</span>`);
+    };
+
     function renderFilterBar() {
         const bar   = document.getElementById('filter-bar');
         const chips = document.getElementById('filter-chips');
         chips.innerHTML = '';
-
-        if (!activeFilters.length) {
-            bar.classList.remove('visible');
-            return;
-        }
+        if (!activeFilters.length) { bar.classList.remove('visible'); return; }
         bar.classList.add('visible');
         activeFilters.forEach(f => {
             const chip = document.createElement('div');
@@ -350,23 +377,18 @@
 
     window._removeFilter = removeFilter;
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
-    function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
-    function escapeAttr(str) {
-        return String(str).replace(/'/g, "\\'");
-    }
+    function escapeAttr(s) { return String(s).replace(/'/g, "\\'"); }
 
-    // ── Debug logger ─────────────────────────────────────────────────────────
     function dbg(html) {
         console.log('[custom-drill]', html.replace(/<[^>]+>/g, ''));
         const log  = document.getElementById('debug-log');
         const line = document.createElement('div');
-        line.className = 'debug-line';
-        line.innerHTML = `<span class="tag">[${new Date().toLocaleTimeString()}]</span>${html}`;
+        line.className = 'dbline';
+        line.innerHTML = `<span class="t">[${new Date().toLocaleTimeString()}]</span>${html}`;
         log.appendChild(line);
         log.scrollTop = log.scrollHeight;
     }
