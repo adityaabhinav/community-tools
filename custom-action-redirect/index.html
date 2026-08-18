@@ -108,7 +108,7 @@
         }
 
         dbg(`<span class="ok">Redirecting to: ${escapeHtml(REDIRECT_URL)}</span>`);
-        window.open(REDIRECT_URL, '_blank');
+        window.location.href = REDIRECT_URL;
     });
 
     embed.on(EmbedEvent.Error, e =>
