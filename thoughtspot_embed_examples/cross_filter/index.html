@@ -77,11 +77,24 @@
     }
     #clear-btn:hover { background: #dc2626; }
 
+    #test-btn {
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #test-btn:hover { background: #6d28d9; }
+
     .embed-wrapper {
       flex: 1;
       background: #fff;
       margin: 12px;
-      border-radius: 10px;
+      margin-bottom: 0;
+      border-radius: 10px 10px 0 0;
       border: 1px solid #e5e7eb;
       overflow: hidden;
       box-shadow: 0 1px 4px rgba(0,0,0,.06);
@@ -93,7 +106,7 @@
 
 <div class="header">
   <h1>ThoughtSpot Liveboard — Cross-Filter Demo</h1>
-  <p>Click any viz → applies global filter on the actual column behind the Group By parameter</p>
+  <p>Click any viz → applies runtime filter on the actual column behind the Group By parameter</p>
 </div>
 
 <div class="toolbar">
@@ -108,20 +121,24 @@
   <div class="divider"></div>
   <span id="status-text">⏳ Initialising…</span>
   <div id="pills"></div>
-  <button id="clear-btn" onclick="clearFilters()">✕ Clear Filters</button>
+  <button id="test-btn" title="Manually fire UpdateRuntimeFilters with a known value to verify the column name is correct">🧪 Test Filter</button>
+  <button id="clear-btn" onclick="clearFilters()">✕ Clear</button>
 </div>
 
-<!-- Debug panel — shows raw click payload so you can verify column names -->
+<!--
+  Debug panel — persists VizPointClick data.
+  EmbedEvent.Filter (Pendo analytics) no longer overwrites it.
+-->
 <div id="debug-panel" style="
   position:fixed; bottom:0; left:12px; right:12px; z-index:9999;
   background:#1e1e1e; color:#d4d4d4; font-family:monospace; font-size:12px;
   padding:10px 16px; border-radius:8px 8px 0 0;
-  border:1px solid #444; max-height:180px; overflow-y:auto; display:none;
+  border:1px solid #444; max-height:200px; overflow-y:auto; display:none;
 ">
-  <div style="color:#9cdcfe; margin-bottom:4px; font-size:11px;">
-    DEBUG — VizPointClick payload (open this to verify column names)
+  <div style="color:#9cdcfe; margin-bottom:6px; font-size:11px; display:flex; justify-content:space-between;">
+    <span id="debug-title">DEBUG — last UpdateRuntimeFilters call</span>
     <button onclick="document.getElementById('debug-panel').style.display='none'"
-      style="float:right;background:none;border:none;color:#888;cursor:pointer">✕</button>
+      style="background:none;border:none;color:#888;cursor:pointer;font-size:14px;">✕</button>
   </div>
   <pre id="debug-output" style="margin:0;white-space:pre-wrap;"></pre>
 </div>
@@ -140,56 +157,72 @@
     RuntimeFilterOp,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
-  // ── Config — update these to match your ThoughtSpot setup ────────────────
-  const TS_HOST   = 'https://ps-internal.thoughtspot.cloud';
-  const LB_ID     = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
-
-  // Parameter name exactly as defined in the ThoughtSpot data model
+  // ── Config ────────────────────────────────────────────────────────────────
+  const TS_HOST    = 'https://ps-internal.thoughtspot.cloud';
+  const LB_ID      = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
   const PARAM_NAME = 'Group By';
 
-  // Maps each value of the "Group By" parameter → the actual worksheet column
-  // to apply the runtime filter on.
-  // Column names must match EXACTLY as shown in the liveboard filter bar
-  // Screenshot shows: "product (Select)" and "store (Select)" → lowercase
+  // Maps each "Group By" parameter value → actual worksheet column name (exact, case-sensitive)
+  // If runtime filter still doesn't appear, check the exact column name in ThoughtSpot
+  // Worksheet → open the column and copy the Display Name exactly as it appears.
   const PARAM_TO_COLUMN = {
     'Office':  'Office',
-    'Product': 'product',   // lowercase — matches the "product (Select)" chip
-    'Store':   'store',     // lowercase — matches the "store (Select)" chip
+    'Product': 'product',
+    'Store':   'store',
   };
   // ─────────────────────────────────────────────────────────────────────────
 
-  // ── UI helpers ────────────────────────────────────────────────────────────
   const $status      = document.getElementById('status-text');
   const $pills       = document.getElementById('pills');
   const $clearBtn    = document.getElementById('clear-btn');
   const $paramSelect = document.getElementById('param-select');
   const $debugPanel  = document.getElementById('debug-panel');
+  const $debugTitle  = document.getElementById('debug-title');
   const $debugOutput = document.getElementById('debug-output');
 
-  function showDebug(obj) {
+  let triggerCount = 0;
+
+  function showDebug(title, obj) {
     $debugPanel.style.display = 'block';
+    $debugTitle.textContent   = title;
     $debugOutput.textContent  = JSON.stringify(obj, null, 2);
   }
 
-  let activeFilters   = [];
-  let activeParamValue = $paramSelect.value;   // tracks current Group By selection
+  let activeFilters    = [];
+  let activeParamValue = $paramSelect.value;
 
   function renderFilters() {
     $pills.innerHTML = '';
     activeFilters.forEach(f => {
       const pill = document.createElement('span');
-      pill.className = 'pill';
+      pill.className   = 'pill';
       pill.textContent = `${f.columnName} = "${f.values[0]}"`;
       $pills.appendChild(pill);
     });
     $clearBtn.style.display = activeFilters.length ? 'inline-block' : 'none';
   }
 
+  function applyRuntimeFilter(columnName, value, source) {
+    const fp = [{ columnName, operator: RuntimeFilterOp.EQ, values: [value] }];
+    triggerCount++;
+    showDebug(`#${triggerCount} ${source} → UpdateRuntimeFilters`, {
+      columnName,
+      value,
+      operator: 'EQ',
+      activeParamValue,
+      note: 'If no chip appears in liveboard filter bar, the column name above is likely wrong. Check exact column name in ThoughtSpot worksheet.',
+    });
+    console.log(`[${source}] UpdateRuntimeFilters #${triggerCount}:`, JSON.stringify(fp));
+    embed.trigger(HostEvent.UpdateRuntimeFilters, fp);
+    activeFilters = fp;
+    $status.textContent = `✅ #${triggerCount} Filter sent → ${columnName} = "${value}"`;
+    renderFilters();
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
   await init({
     thoughtSpotHost: TS_HOST,
     authType: AuthType.None,
-    // Pre-requisite: be logged into ps-internal.thoughtspot.cloud in this browser
   });
 
   // ── Embed ─────────────────────────────────────────────────────────────────
@@ -198,29 +231,38 @@
     fullHeight: true,
     enableVizTransformations: true,
     frameParams: { width: '100%' },
-    // Set initial parameter to match the dropdown default so they stay in sync
     runtimeParameters: [{ name: PARAM_NAME, value: activeParamValue }],
   });
 
   window.__embed = embed;
 
-  // ── Parameter dropdown — syncs Group By into the liveboard ───────────────
+  // ── Parameter dropdown ───────────────────────────────────────────────────
   $paramSelect.addEventListener('change', (e) => {
     activeParamValue = e.target.value;
-    console.log(`[Param] Group By changed to: "${activeParamValue}"`);
-
-    // Push the new parameter value into the liveboard
-    embed.trigger(HostEvent.UpdateParameters, [
-      { name: PARAM_NAME, value: activeParamValue },
-    ]);
-
-    // Clear any existing global filter since the column has changed
+    embed.trigger(HostEvent.UpdateParameters, [{ name: PARAM_NAME, value: activeParamValue }]);
     activeFilters = [];
     renderFilters();
-    $status.textContent = `🔄 Group By set to "${activeParamValue}" — click a viz to filter`;
+    $status.textContent = `🔄 Group By set to "${activeParamValue}" — click a viz or 🧪 Test Filter`;
   });
 
-  // ── VizPointClick → resolve actual column → apply global filter ──────────
+  // ── 🧪 Test Filter button ─────────────────────────────────────────────────
+  // Fires UpdateRuntimeFilters with a fixed value so you can verify the column
+  // name is correct WITHOUT having to click a viz. If a filter chip appears in
+  // the liveboard filter bar after clicking this, the column name is correct.
+  document.getElementById('test-btn').addEventListener('click', () => {
+    const col = PARAM_TO_COLUMN[activeParamValue];
+    if (!col) {
+      $status.textContent = `⚠️ No column mapping for "${activeParamValue}"`;
+      return;
+    }
+    // Use known values from the liveboard as test values
+    const TEST_VALUES = { product: 'Yosemite jacket', store: 'Yosemite', Office: 'Retail' };
+    const testVal = TEST_VALUES[col] ?? 'test-value';
+    applyRuntimeFilter(col, testVal, 'TestBtn');
+    $status.textContent += ` — if no chip appears, column name "${col}" is wrong`;
+  });
+
+  // ── VizPointClick → resolve actual column → apply runtime filter ──────────
   embed.on(EmbedEvent.VizPointClick, (payload) => {
     try {
       console.log('[VizPointClick] raw payload:', payload);
@@ -230,15 +272,9 @@
         payload?.clickedPoint ??
         null;
 
-      // Show raw payload on screen for easy verification
-      showDebug({
-        activeParamValue,
-        resolvedColumn: PARAM_TO_COLUMN[activeParamValue] ?? '⚠️ NOT IN MAP',
-        clickedPoint: point,
-      });
-
       if (!point) {
         console.warn('[VizPointClick] no clickedPoint in payload');
+        showDebug('VizPointClick — no clickedPoint', { payload });
         return;
       }
 
@@ -246,43 +282,26 @@
 
       if (selectedAttributes.length === 0) {
         $status.textContent = '⚠️ No dimension in clicked point — try a bar or table row';
+        showDebug('VizPointClick — no selectedAttributes', { point });
         return;
       }
 
       const attrName     = selectedAttributes[0].name;
       const clickedValue = String(selectedAttributes[0].value);
 
-      // If the user clicked the derived "Group by field" column, resolve
-      // the actual column via the parameter mapping.
-      // If they clicked a real column (e.g. "product", "store") use it directly.
       let actualColumn;
       if (attrName === 'Group by field') {
         actualColumn = PARAM_TO_COLUMN[activeParamValue];
         if (!actualColumn) {
-          $status.textContent = `⚠️ No mapping defined for Group By = "${activeParamValue}"`;
+          $status.textContent = `⚠️ No mapping for Group By = "${activeParamValue}"`;
+          showDebug('VizPointClick — no column mapping', { attrName, activeParamValue, PARAM_TO_COLUMN });
           return;
         }
-        console.log(`[VizPointClick] derived "Group by field" → param "${activeParamValue}" → column "${actualColumn}"`);
       } else {
         actualColumn = attrName;
-        console.log(`[VizPointClick] real attribute "${attrName}" used directly as column`);
       }
 
-      const filterPayload = [
-        { columnName: actualColumn, operator: RuntimeFilterOp.EQ, values: [clickedValue] },
-      ];
-
-      console.log(`[VizPointClick] applying → ${actualColumn} = "${clickedValue}"`);
-      console.log('[VizPointClick] Sending UpdateRuntimeFilters:', JSON.stringify(filterPayload));
-
-      activeFilters = filterPayload;
-
-      // UpdateRuntimeFilters is the confirmed SDK event for pushing filters
-      // into the liveboard filter bar from the host app
-      embed.trigger(HostEvent.UpdateRuntimeFilters, filterPayload);
-
-      $status.textContent = `✅ Filter applied → ${actualColumn} = "${clickedValue}"`;
-      renderFilters();
+      applyRuntimeFilter(actualColumn, clickedValue, 'VizPointClick');
 
     } catch (err) {
       console.error('[VizPointClick] error:', err);
@@ -290,15 +309,14 @@
     }
   });
 
-  // ── EmbedEvent.Filter → intercept "Group by field" → apply runtime filter ────
-  // ThoughtSpot fires this when its native cross-filter activates; VizPointClick
-  // may not fire when the click is consumed internally.
+  // ── EmbedEvent.Filter ─────────────────────────────────────────────────────
+  // ThoughtSpot may fire this with cross-filter data; Pendo analytics also
+  // fires it with { action: "pendo::connect" } — we ignore those silently
+  // WITHOUT overwriting the VizPointClick debug.
   let applyingFilter = false;
 
   embed.on(EmbedEvent.Filter, (payload) => {
     if (applyingFilter) return;
-
-    showDebug({ event: 'EmbedEvent.Filter', activeParamValue, payload });
 
     const filters = payload?.data?.filters ?? payload?.filters ?? [];
     const groupByFilter = filters.find(f => {
@@ -306,33 +324,22 @@
       return name === 'Group by field';
     });
 
+    // Ignore Pendo events (no real filters in payload)
     if (!groupByFilter) return;
 
     const actualColumn = PARAM_TO_COLUMN[activeParamValue];
-    const value = String(
-      groupByFilter.values?.[0] ?? groupByFilter.value ?? ''
-    );
+    const value = String(groupByFilter.values?.[0] ?? groupByFilter.value ?? '');
 
-    if (!actualColumn || !value) {
-      $status.textContent = `⚠️ Cannot resolve column for Group By = "${activeParamValue}"`;
-      return;
-    }
-
-    console.log(`[Filter] "Group by field" → ${actualColumn} = "${value}"`);
+    if (!actualColumn || !value) return;
 
     applyingFilter = true;
-    activeFilters = [{ columnName: actualColumn, operator: RuntimeFilterOp.EQ, values: [value] }];
-    embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
-
-    $status.textContent = `✅ Filter applied → ${actualColumn} = "${value}"`;
-    renderFilters();
-
+    applyRuntimeFilter(actualColumn, value, 'EmbedEvent.Filter');
     setTimeout(() => { applyingFilter = false; }, 1000);
   });
 
   embed
-    .on(EmbedEvent.Load,  () => {
-      $status.textContent = `🟢 Loaded — Group By is "${activeParamValue}". Click any chart to filter.`;
+    .on(EmbedEvent.Load, () => {
+      $status.textContent = `🟢 Loaded — Group By is "${activeParamValue}". Click any chart or use 🧪 Test Filter.`;
     })
     .on(EmbedEvent.Error, (e) => {
       console.error('Embed error', e);
