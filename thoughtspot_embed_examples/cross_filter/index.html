@@ -76,22 +76,19 @@
     }
     #clear-btn:hover { background: #dc2626; }
 
-    /* Debug bar — always visible at the bottom so we can see what fires */
+    /* Always-visible debug bar — shows exactly what event arrived last */
     #debug-bar {
       background: #1e1e1e;
-      color: #d4d4d4;
+      color: #9cdcfe;
       font-family: monospace;
-      font-size: 12px;
-      padding: 6px 16px;
-      border-top: 1px solid #444;
+      font-size: 11px;
+      padding: 5px 14px;
+      border-top: 1px solid #333;
       flex-shrink: 0;
-      min-height: 28px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    #debug-bar span { color: #9cdcfe; font-size: 11px; white-space: nowrap; }
-    #debug-msg { flex: 1; color: #d4d4d4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .embed-wrapper {
       flex: 1;
@@ -110,7 +107,7 @@
 
 <div class="header">
   <h1>ThoughtSpot Liveboard — Cross-Filter Demo</h1>
-  <p>Click any viz → resolves column from Group By parameter → applies runtime filter</p>
+  <p>Native cross-filter preserved · runtime filter also applied on the underlying column</p>
 </div>
 
 <div class="toolbar">
@@ -131,11 +128,8 @@
   <div id="ts-embed"></div>
 </div>
 
-<!-- Always-visible debug bar at the bottom -->
-<div id="debug-bar">
-  <span>DEBUG:</span>
-  <div id="debug-msg">waiting for events…</div>
-</div>
+<!-- Always-visible debug bar — shows what postMessage arrived last -->
+<div id="debug-bar">waiting for events…</div>
 
 <script type="module">
   import {
@@ -145,7 +139,6 @@
     EmbedEvent,
     HostEvent,
     RuntimeFilterOp,
-    Action,
   } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
   // ── Config ────────────────────────────────────────────────────────────────
@@ -153,7 +146,6 @@
   const LB_ID      = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
   const PARAM_NAME = 'Group By';
 
-  // Maps Group By parameter value → actual worksheet column name (exact, case-sensitive)
   const PARAM_TO_COLUMN = {
     'Product': 'product',
     'Store':   'store',
@@ -165,13 +157,13 @@
   const $pills       = document.getElementById('pills');
   const $clearBtn    = document.getElementById('clear-btn');
   const $paramSelect = document.getElementById('param-select');
-  const $debugMsg    = document.getElementById('debug-msg');
+  const $debugBar    = document.getElementById('debug-bar');
 
   let activeFilters    = [];
   let activeParamValue = $paramSelect.value;
 
   function dbg(msg) {
-    $debugMsg.textContent = msg;
+    $debugBar.textContent = msg;
     console.log('[DBG]', msg);
   }
 
@@ -186,25 +178,29 @@
     $clearBtn.style.display = activeFilters.length ? 'inline-block' : 'none';
   }
 
+  function applyRuntimeFilter(col, val, source) {
+    const fp = [{ columnName: col, operator: RuntimeFilterOp.EQ, values: [val] }];
+    dbg(`[${source}] UpdateRuntimeFilters → ${col} = "${val}"`);
+    embed.trigger(HostEvent.UpdateRuntimeFilters, fp);
+    activeFilters = fp;
+    $status.textContent = `✅ Filter → ${col} = "${val}"  (via ${source})`;
+    renderFilters();
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
   await init({
     thoughtSpotHost: TS_HOST,
     authType: AuthType.None,
   });
 
-  dbg('SDK init done — creating embed…');
-
-  // ── Embed ─────────────────────────────────────────────────────────────────
-  // hiddenActions: [Action.CrossFilter] prevents ThoughtSpot from applying its
-  // native cross-filter on bar click. The click instead fires VizPointClick to
-  // the host app, letting us apply UpdateRuntimeFilters on the actual column.
+  // ── Embed — native cross-filter left ON ───────────────────────────────────
   const embed = new LiveboardEmbed('#ts-embed', {
     liveboardId: LB_ID,
     fullHeight: true,
     enableVizTransformations: true,
     frameParams: { width: '100%' },
     runtimeParameters: [{ name: PARAM_NAME, value: activeParamValue }],
-    hiddenActions: [Action.CrossFilter, Action.RemoveCrossFilter],
+    // No hiddenActions — native cross-filter remains active
   });
 
   window.__embed = embed;
@@ -219,68 +215,111 @@
     dbg(`UpdateParameters → Group By = "${activeParamValue}"`);
   });
 
-  // ── VizPointClick → resolve column → apply runtime filter ────────────────
-  embed.on(EmbedEvent.VizPointClick, (payload) => {
-    dbg('VizPointClick fired — processing…');
-    try {
-      const point =
-        payload?.data?.clickedPoint ??
-        payload?.clickedPoint ??
-        null;
+  // ── Raw postMessage listener ───────────────────────────────────────────────
+  // VizPointClick does NOT fire when ThoughtSpot applies a native cross-filter —
+  // ThoughtSpot handles the click internally. But the iframe still sends a
+  // postMessage to the parent. We intercept ALL messages, log their action names
+  // (visible in the debug bar + console), and handle the cross-filter message
+  // once we can confirm its exact format from the logs.
+  window.addEventListener('message', (event) => {
+    if (!event.data || typeof event.data !== 'object') return;
 
-      if (!point) {
-        dbg('VizPointClick: no clickedPoint in payload');
-        $status.textContent = '⚠️ No clickedPoint — check console for raw payload';
-        console.warn('[VizPointClick] raw payload:', JSON.stringify(payload, null, 2));
-        return;
+    const msg    = event.data;
+    const action = String(msg?.action ?? msg?.type ?? msg?.data?.action ?? '');
+
+    // Skip known analytics noise
+    if (!action || action.startsWith('pendo') || action === 'webpack') return;
+
+    // Log everything else so we can see what the cross-filter event looks like
+    dbg(`postMsg: "${action}"`);
+    console.log('[TS postMsg]', action, JSON.stringify(msg, null, 2));
+
+    // ── Attempt to handle cross-filter (action name confirmed from logs) ───
+    // ThoughtSpot may use names like "crossFilter", "CROSS_FILTER", "applyFilter",
+    // "vizCrossFilter", etc. We match broadly and refine after seeing the logs.
+    const actionLc = action.toLowerCase().replace(/[_-]/g, '');
+
+    if (actionLc.includes('crossfilter') || actionLc === 'vizmouseclick') {
+      console.log('[CrossFilter candidate] full message:', JSON.stringify(msg, null, 2));
+
+      // Try several payload shapes — narrow down after logs confirm format
+      const inner   = msg?.data ?? msg;
+      const filters =
+        inner?.filters ??
+        inner?.crossFilters ??
+        inner?.filterContent ??
+        inner?.clickedPoint?.selectedAttributes ?? [];
+
+      const gbFilter = Array.isArray(filters) && filters.find(f => {
+        const name = String(f.columnName ?? f.column ?? f.name ?? f.displayName ?? '');
+        return name === 'Group by field';
+      });
+
+      if (gbFilter) {
+        const col = PARAM_TO_COLUMN[activeParamValue];
+        const val = String(
+          gbFilter.values?.[0] ?? gbFilter.value ?? gbFilter.selectedValues?.[0] ?? ''
+        );
+        if (col && val) applyRuntimeFilter(col, val, 'postMsg:crossFilter');
       }
+    }
+
+    // ── VizPointClick via raw message (fires independently of cross-filter) ─
+    if (actionLc === 'vizpointclick' || actionLc === 'charttablemouseclick') {
+      const inner  = msg?.data ?? msg;
+      const point  = inner?.clickedPoint ?? inner;
+      const attrs  = point?.selectedAttributes ?? [];
+
+      if (attrs.length > 0) {
+        const attrName = attrs[0].name;
+        const val      = String(attrs[0].value ?? '');
+        const col =
+          attrName === 'Group by field'
+            ? PARAM_TO_COLUMN[activeParamValue]
+            : attrName;
+
+        if (col && val) applyRuntimeFilter(col, val, 'postMsg:vizPointClick');
+      }
+    }
+  });
+
+  // ── SDK VizPointClick (fires when cross-filter is NOT the handler) ────────
+  embed.on(EmbedEvent.VizPointClick, (payload) => {
+    dbg('SDK VizPointClick fired');
+    try {
+      const point = payload?.data?.clickedPoint ?? payload?.clickedPoint ?? null;
+      if (!point) return;
 
       const attrs = point.selectedAttributes ?? [];
-      dbg(`VizPointClick: ${attrs.length} attr(s) — ${attrs.map(a => `${a.name}=${a.value}`).join(', ') || 'none'}`);
-
       if (attrs.length === 0) {
-        $status.textContent = '⚠️ Click landed on a measure — try clicking the category label area';
+        $status.textContent = '⚠️ Click hit a measure — try the category label';
         return;
       }
 
-      const attrName     = attrs[0].name;
-      const clickedValue = String(attrs[0].value);
-
-      // "Group by field" is the derived column driven by the parameter.
-      // Map it to the real underlying column.
-      const actualColumn =
+      const attrName = attrs[0].name;
+      const val      = String(attrs[0].value ?? '');
+      const col =
         attrName === 'Group by field'
           ? PARAM_TO_COLUMN[activeParamValue]
           : attrName;
 
-      if (!actualColumn) {
-        $status.textContent = `⚠️ No column mapping for Group By = "${activeParamValue}"`;
-        dbg(`No mapping: PARAM_TO_COLUMN["${activeParamValue}"] is undefined`);
+      if (!col) {
+        dbg(`No mapping for "${activeParamValue}"`);
         return;
       }
 
-      const fp = [{ columnName: actualColumn, operator: RuntimeFilterOp.EQ, values: [clickedValue] }];
-      dbg(`Triggering UpdateRuntimeFilters → ${actualColumn} = "${clickedValue}"`);
-      embed.trigger(HostEvent.UpdateRuntimeFilters, fp);
-
-      activeFilters = fp;
-      $status.textContent = `✅ Filter applied → ${actualColumn} = "${clickedValue}"`;
-      renderFilters();
-
+      applyRuntimeFilter(col, val, 'VizPointClick');
     } catch (err) {
-      console.error('[VizPointClick]', err);
-      $status.textContent = `❌ ${err.message}`;
-      dbg(`ERROR: ${err.message}`);
+      dbg(`VizPointClick error: ${err.message}`);
     }
   });
 
   embed
     .on(EmbedEvent.Load, () => {
-      $status.textContent = `🟢 Loaded — Group By is "${activeParamValue}". Click any bar to filter.`;
-      dbg('EmbedEvent.Load received — liveboard ready');
+      $status.textContent = `🟢 Loaded — Group By is "${activeParamValue}". Click any bar.`;
+      dbg('EmbedEvent.Load — liveboard ready');
     })
     .on(EmbedEvent.Error, (e) => {
-      console.error('Embed error', e);
       $status.textContent = '❌ Embed error — check console';
       dbg(`EmbedEvent.Error: ${JSON.stringify(e)}`);
     })
