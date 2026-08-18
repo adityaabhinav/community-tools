@@ -111,6 +111,20 @@
   <button id="clear-btn" onclick="clearFilters()">✕ Clear Filters</button>
 </div>
 
+<!-- Debug panel — shows raw click payload so you can verify column names -->
+<div id="debug-panel" style="
+  background:#1e1e1e; color:#d4d4d4; font-family:monospace; font-size:12px;
+  padding:10px 16px; margin:0 12px 0; border-radius:8px 8px 0 0;
+  border:1px solid #333; max-height:140px; overflow-y:auto; display:none;
+">
+  <div style="color:#9cdcfe; margin-bottom:4px; font-size:11px;">
+    DEBUG — VizPointClick payload (open this to verify column names)
+    <button onclick="document.getElementById('debug-panel').style.display='none'"
+      style="float:right;background:none;border:none;color:#888;cursor:pointer">✕</button>
+  </div>
+  <pre id="debug-output" style="margin:0;white-space:pre-wrap;"></pre>
+</div>
+
 <div class="embed-wrapper">
   <div id="ts-embed"></div>
 </div>
@@ -134,10 +148,12 @@
 
   // Maps each value of the "Group By" parameter → the actual worksheet column
   // to apply the runtime filter on.
+  // Column names must match EXACTLY as shown in the liveboard filter bar
+  // Screenshot shows: "product (Select)" and "store (Select)" → lowercase
   const PARAM_TO_COLUMN = {
     'Office':  'Office',
-    'Product': 'Product',
-    'Store':   'Store',
+    'Product': 'product',   // lowercase — matches the "product (Select)" chip
+    'Store':   'store',     // lowercase — matches the "store (Select)" chip
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -146,6 +162,13 @@
   const $pills       = document.getElementById('pills');
   const $clearBtn    = document.getElementById('clear-btn');
   const $paramSelect = document.getElementById('param-select');
+  const $debugPanel  = document.getElementById('debug-panel');
+  const $debugOutput = document.getElementById('debug-output');
+
+  function showDebug(obj) {
+    $debugPanel.style.display = 'block';
+    $debugOutput.textContent  = JSON.stringify(obj, null, 2);
+  }
 
   let activeFilters   = [];
   let activeParamValue = $paramSelect.value;   // tracks current Group By selection
@@ -203,6 +226,13 @@
         payload?.data?.clickedPoint ??
         payload?.clickedPoint ??
         null;
+
+      // Show raw payload on screen for easy verification
+      showDebug({
+        activeParamValue,
+        resolvedColumn: PARAM_TO_COLUMN[activeParamValue] ?? '⚠️ NOT IN MAP',
+        clickedPoint: point,
+      });
 
       if (!point) {
         console.warn('[VizPointClick] no clickedPoint in payload');
