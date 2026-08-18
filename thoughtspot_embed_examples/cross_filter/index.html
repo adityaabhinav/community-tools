@@ -113,9 +113,10 @@
 
 <!-- Debug panel — shows raw click payload so you can verify column names -->
 <div id="debug-panel" style="
+  position:fixed; bottom:0; left:12px; right:12px; z-index:9999;
   background:#1e1e1e; color:#d4d4d4; font-family:monospace; font-size:12px;
-  padding:10px 16px; margin:0 12px 0; border-radius:8px 8px 0 0;
-  border:1px solid #333; max-height:140px; overflow-y:auto; display:none;
+  padding:10px 16px; border-radius:8px 8px 0 0;
+  border:1px solid #444; max-height:180px; overflow-y:auto; display:none;
 ">
   <div style="color:#9cdcfe; margin-bottom:4px; font-size:11px;">
     DEBUG — VizPointClick payload (open this to verify column names)
@@ -287,6 +288,46 @@
       console.error('[VizPointClick] error:', err);
       $status.textContent = `❌ ${err.message}`;
     }
+  });
+
+  // ── EmbedEvent.Filter → intercept "Group by field" → apply runtime filter ────
+  // ThoughtSpot fires this when its native cross-filter activates; VizPointClick
+  // may not fire when the click is consumed internally.
+  let applyingFilter = false;
+
+  embed.on(EmbedEvent.Filter, (payload) => {
+    if (applyingFilter) return;
+
+    showDebug({ event: 'EmbedEvent.Filter', activeParamValue, payload });
+
+    const filters = payload?.data?.filters ?? payload?.filters ?? [];
+    const groupByFilter = filters.find(f => {
+      const name = f.columnName ?? f.column_name ?? f.name ?? '';
+      return name === 'Group by field';
+    });
+
+    if (!groupByFilter) return;
+
+    const actualColumn = PARAM_TO_COLUMN[activeParamValue];
+    const value = String(
+      groupByFilter.values?.[0] ?? groupByFilter.value ?? ''
+    );
+
+    if (!actualColumn || !value) {
+      $status.textContent = `⚠️ Cannot resolve column for Group By = "${activeParamValue}"`;
+      return;
+    }
+
+    console.log(`[Filter] "Group by field" → ${actualColumn} = "${value}"`);
+
+    applyingFilter = true;
+    activeFilters = [{ columnName: actualColumn, operator: RuntimeFilterOp.EQ, values: [value] }];
+    embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
+
+    $status.textContent = `✅ Filter applied → ${actualColumn} = "${value}"`;
+    renderFilters();
+
+    setTimeout(() => { applyingFilter = false; }, 1000);
   });
 
   embed
