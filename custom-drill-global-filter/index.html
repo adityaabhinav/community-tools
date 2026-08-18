@@ -150,19 +150,23 @@
     // When a drill fires on this column:
     //   filter column = current value of the "Group By" parameter
     //   filter value  = the clicked value in "Group by field"
-    const GROUP_BY_COLUMN_NAME = 'Group by field';
-    const GROUP_BY_PARAM_NAME  = 'Group By';
+    const GROUP_BY_COLUMN_NAME  = 'Group by field';
+    const GROUP_BY_PARAM_NAME   = 'Group By';
+    // Default value of the "Group By" parameter as configured in ThoughtSpot.
+    // This is used immediately on page load so drills work even before the
+    // user changes the parameter and even if GetParameters is unsupported.
+    const GROUP_BY_PARAM_DEFAULT = 'Region'; // ← set to your parameter's default value
     // Only populate this if a parameter value string differs from the column
     // name you want to filter on (e.g. param = 'Store' but column = 'Store Name').
-    const GROUP_BY_PARAM_MAP   = {};
+    const GROUP_BY_PARAM_MAP    = {};
 
     // ════════════════════════════════════════════════════════════════════════
 
-    let activeFilters       = [];
-    // Holds the current value of the Group By parameter.
-    // Updated automatically from EmbedEvent.LiveboardRendered when
-    // GROUP_BY_PARAM_NAME is configured, or set manually via setGroupByParam().
-    let currentGroupByParam = null;
+    let activeFilters = [];
+    // Seeded from GROUP_BY_PARAM_DEFAULT so drills work immediately on page
+    // load without waiting for GetParameters or a user-driven parameter change.
+    // Overwritten by GetParameters on every LiveboardRendered.
+    let currentGroupByParam = GROUP_BY_PARAM_DEFAULT ?? null;
 
     // ── SDK init ────────────────────────────────────────────────────────────
     init({
