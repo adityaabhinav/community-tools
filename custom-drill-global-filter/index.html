@@ -142,8 +142,59 @@
     // ════════════════════════════════════════════════════════════════════════
 
     let activeFilters       = [];
-    // Set by HostEvent.GetParameters each time the custom action fires.
+    // Set by postMessage interceptor or HostEvent.GetParameters.
     let currentGroupByParam = null;
+
+    // ── postMessage interceptor ──────────────────────────────────────────────
+    // ThoughtSpot's SDK communicates with its iframe via postMessage. Parameter
+    // state is broadcast in several message types — we sniff them all to keep
+    // currentGroupByParam up to date without relying on HostEvent.GetParameters.
+    window.addEventListener('message', (event) => {
+        if (!event.origin.startsWith(CLUSTER_URL)) return;
+        const msg = event.data;
+        if (!msg || typeof msg !== 'object') return;
+
+        // Extract parameter list from whatever shape the message uses.
+        const paramList =
+            msg?.payload?.parameters ??
+            msg?.payload?.runtimeParameters ??
+            msg?.data?.parameters ??
+            msg?.data?.runtimeParameters ??
+            msg?.parameters ??
+            msg?.runtimeParameters ??
+            null;
+
+        if (Array.isArray(paramList) && paramList.length) {
+            console.log('[custom-drill] postMessage param list:', paramList);
+            const nameLower = GROUP_BY_PARAM_NAME.toLowerCase();
+            const hit = paramList.find(p =>
+                String(p.name ?? p.parameterName ?? p.key ?? '').toLowerCase() === nameLower
+            );
+            const val = hit?.value ?? hit?.parameterValue ?? hit?.currentValue;
+            if (val != null) {
+                const strVal = String(val);
+                if (strVal !== currentGroupByParam) {
+                    currentGroupByParam = strVal;
+                    dbg(`<span class="ok">postMessage → Group By param updated to "${escapeHtml(strVal)}"</span>`);
+                }
+            }
+        }
+
+        // Flat key shape: { "Group By": "Product", ... } somewhere in the payload
+        const search = (obj) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj[GROUP_BY_PARAM_NAME] != null) {
+                const strVal = String(obj[GROUP_BY_PARAM_NAME]);
+                if (strVal !== currentGroupByParam) {
+                    currentGroupByParam = strVal;
+                    dbg(`<span class="ok">postMessage (flat key) → Group By param updated to "${escapeHtml(strVal)}"</span>`);
+                }
+            }
+        };
+        search(msg?.payload);
+        search(msg?.data);
+        search(msg);
+    });
 
     // ── SDK init ────────────────────────────────────────────────────────────
     init({
@@ -183,20 +234,21 @@
         // Called here (not on LiveboardRendered) because the liveboard is
         // guaranteed to be fully interactive when a custom action fires.
         if (GROUP_BY_PARAM_NAME) {
+            dbg(`GetParameters event key in SDK: <span class="v">${escapeHtml(String(HostEvent.GetParameters))}</span>`);
             try {
                 const resp = await embed.trigger(HostEvent.GetParameters);
                 console.log('[custom-drill] GetParameters response:', resp);
-                dbg(`GetParameters: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
+                dbg(`GetParameters raw: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
 
                 const paramVal = pickParam(resp, GROUP_BY_PARAM_NAME);
                 if (paramVal != null) {
                     currentGroupByParam = paramVal;
-                    dbg(`<span class="ok">Group By from GetParameters → "${escapeHtml(paramVal)}"</span>`);
+                    dbg(`<span class="ok">GetParameters → Group By = "${escapeHtml(paramVal)}"</span>`);
                 } else {
-                    dbg(`<span class="w">GetParameters returned no value for "${escapeHtml(GROUP_BY_PARAM_NAME)}" — falling back to dropdown (${escapeHtml(String(currentGroupByParam))})</span>`);
+                    dbg(`<span class="w">GetParameters: no value for "${escapeHtml(GROUP_BY_PARAM_NAME)}" (postMessage listener has: ${escapeHtml(String(currentGroupByParam))})</span>`);
                 }
             } catch (e) {
-                dbg(`<span class="w">GetParameters threw: ${escapeHtml(String(e))} — falling back to dropdown (${escapeHtml(String(currentGroupByParam))})</span>`);
+                dbg(`<span class="w">GetParameters threw: ${escapeHtml(String(e))} (postMessage listener has: ${escapeHtml(String(currentGroupByParam))})</span>`);
             }
         }
 
