@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Drill – Global Filter</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f6f8;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #filter-bar {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: #e8f0fe;
+            border-bottom: 1px solid #c5d5f5;
+            font-size: 14px;
+        }
+
+        #filter-bar.visible { display: flex; }
+
+        #filter-bar .label { font-weight: 600; color: #1a3a6b; }
+
+        #filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            flex: 1;
+        }
+
+        .chip {
+            background: #fff;
+            border: 1px solid #4a7fd4;
+            border-radius: 14px;
+            padding: 3px 10px;
+            font-size: 12px;
+            color: #1a3a6b;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chip button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #666;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .chip button:hover { color: #c00; }
+
+        #clear-all {
+            background: none;
+            border: 1px solid #c0392b;
+            border-radius: 4px;
+            color: #c0392b;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 10px;
+            white-space: nowrap;
+        }
+
+        #clear-all:hover { background: #fdf0ee; }
+
+        #embed-container {
+            flex: 1;
+            width: 100%;
+        }
+
+        #embed-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="filter-bar">
+    <span class="label">Active Filters:</span>
+    <div id="filter-chips"></div>
+    <button id="clear-all" onclick="clearAllFilters()">Clear all</button>
+</div>
+
+<div id="embed-container"></div>
+
+<script type="module">
+    import {
+        init,
+        LiveboardEmbed,
+        AuthType,
+        EmbedEvent,
+        HostEvent,
+        RuntimeFilterOp,
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    const CLUSTER_URL  = 'https://ps-internal.thoughtspot.cloud';
+    const LIVEBOARD_ID = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
+
+    // Match the Action ID configured in ThoughtSpot (Admin > Custom actions).
+    // Adjust this value if the action was saved under a different ID.
+    const CUSTOM_DRILL_ACTION_ID = 'custom-drill';
+
+    // Runtime filters currently applied to the liveboard
+    let activeFilters = [];
+
+    // ── SDK init ────────────────────────────────────────────────────────────
+    init({
+        thoughtSpotHost: CLUSTER_URL,
+        authType: AuthType.None,   // relies on the user already being logged in
+    });
+
+    const embed = new LiveboardEmbed('#embed-container', {
+        liveboardId: LIVEBOARD_ID,
+        fullHeight: true,
+    });
+
+    // ── Listen for the custom action ────────────────────────────────────────
+    embed.on(EmbedEvent.CustomAction, (payload) => {
+        const id = payload?.data?.id ?? payload?.id;
+        if (id === CUSTOM_DRILL_ACTION_ID) {
+            handleCustomDrill(payload?.data ?? payload);
+        }
+    });
+
+    embed.render();
+
+    // ── Custom drill handler ────────────────────────────────────────────────
+    function handleCustomDrill(data) {
+        const extracted = extractColumnValue(data);
+        if (!extracted.length) {
+            console.warn('[custom-drill] Could not extract column/value from payload', data);
+            return;
+        }
+        // Build one filter per column-value pair extracted from the clicked cell
+        const newFilters = extracted.map(({ columnName, value }) => ({
+            columnName,
+            operator: RuntimeFilterOp.EQ,
+            values: [String(value)],
+        }));
+        applyFilters(newFilters);
+    }
+
+    /**
+     * Tries multiple payload shapes returned by EmbedEvent.CustomAction:
+     *   1. contextMenuPoints (context-menu custom action – most common for drill)
+     *   2. embedAnswerData first row (primary / more-options action)
+     */
+    function extractColumnValue(data) {
+        const results = [];
+
+        // Shape 1: context menu action
+        const points = data?.contextMenuPoints?.selectedPoints ?? [];
+        if (points.length) {
+            const point = points[0];
+            // Attributes (dimensions)
+            for (const attr of (point.selectedAttributes ?? [])) {
+                if (attr?.column?.name != null && attr?.value != null) {
+                    results.push({ columnName: attr.column.name, value: attr.value });
+                }
+            }
+            // Measures
+            for (const [name, value] of Object.entries(point.selectedMeasures ?? {})) {
+                results.push({ columnName: name, value });
+            }
+            if (results.length) return results;
+        }
+
+        // Shape 2: embedAnswerData (full answer payload)
+        const answerData = data?.embedAnswerData;
+        if (answerData?.columns?.length && answerData?.data?.length) {
+            const cols = answerData.columns;
+            const row  = answerData.data[0];
+            cols.forEach((col, i) => {
+                const name = col?.column?.name ?? col?.name;
+                if (name != null && row[i] != null) {
+                    results.push({ columnName: name, value: row[i] });
+                }
+            });
+        }
+
+        return results;
+    }
+
+    // ── Filter management ───────────────────────────────────────────────────
+    function applyFilters(filters) {
+        // Merge: overwrite any existing filter on the same column, keep others
+        filters.forEach(f => {
+            const idx = activeFilters.findIndex(a => a.columnName === f.columnName);
+            if (idx >= 0) activeFilters[idx] = f;
+            else activeFilters.push(f);
+        });
+
+        embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
+        renderFilterBar();
+    }
+
+    function removeFilter(columnName) {
+        activeFilters = activeFilters.filter(f => f.columnName !== columnName);
+        embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
+        renderFilterBar();
+    }
+
+    window.clearAllFilters = function () {
+        activeFilters = [];
+        embed.trigger(HostEvent.UpdateRuntimeFilters, []);
+        renderFilterBar();
+    };
+
+    function renderFilterBar() {
+        const bar   = document.getElementById('filter-bar');
+        const chips = document.getElementById('filter-chips');
+        chips.innerHTML = '';
+
+        if (!activeFilters.length) {
+            bar.classList.remove('visible');
+            return;
+        }
+
+        bar.classList.add('visible');
+        activeFilters.forEach(f => {
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+            chip.innerHTML = `
+                <span>${escapeHtml(f.columnName)} = <strong>${escapeHtml(f.values[0])}</strong></span>
+                <button title="Remove filter" onclick="window._removeFilter('${escapeAttr(f.columnName)}')">×</button>
+            `;
+            chips.appendChild(chip);
+        });
+    }
+
+    // Expose removeFilter to inline onclick handlers
+    window._removeFilter = removeFilter;
+
+    function escapeHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function escapeAttr(str) {
+        return String(str).replace(/'/g, "\\'");
+    }
+</script>
+</body>
+</html>
