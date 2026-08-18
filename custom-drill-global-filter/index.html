@@ -152,21 +152,14 @@
     //   filter value  = the clicked value in "Group by field"
     const GROUP_BY_COLUMN_NAME  = 'Group by field';
     const GROUP_BY_PARAM_NAME   = 'Group By';
-    // Default value of the "Group By" parameter as configured in ThoughtSpot.
-    // This is used immediately on page load so drills work even before the
-    // user changes the parameter and even if GetParameters is unsupported.
-    const GROUP_BY_PARAM_DEFAULT = 'Region'; // ← set to your parameter's default value
     // Only populate this if a parameter value string differs from the column
     // name you want to filter on (e.g. param = 'Store' but column = 'Store Name').
-    const GROUP_BY_PARAM_MAP    = {};
+    const GROUP_BY_PARAM_MAP = {};
 
     // ════════════════════════════════════════════════════════════════════════
 
-    let activeFilters = [];
-    // Seeded from GROUP_BY_PARAM_DEFAULT so drills work immediately on page
-    // load without waiting for GetParameters or a user-driven parameter change.
-    // Overwritten by GetParameters on every LiveboardRendered.
-    let currentGroupByParam = GROUP_BY_PARAM_DEFAULT ?? null;
+    let activeFilters       = [];
+    let currentGroupByParam = null; // set from GetParameters on LiveboardRendered
 
     // ── SDK init ────────────────────────────────────────────────────────────
     init({
@@ -179,28 +172,62 @@
         fullHeight: true,
     });
 
-    // ── Track Group By parameter changes ────────────────────────────────────
-    // LiveboardRendered fires on every render (including after a parameter
-    // change inside the liveboard).  We ask ThoughtSpot for current parameters
-    // at that moment so we always know which column to filter on.
-    embed.on(EmbedEvent.LiveboardRendered, async () => {
+    // ── Track Group By parameter on every liveboard render ──────────────────
+    // LiveboardRendered fires on initial load AND whenever the liveboard
+    // re-renders (e.g. after the user changes the Group By parameter).
+    embed.on(EmbedEvent.LiveboardRendered, async (lbPayload) => {
         if (!GROUP_BY_PARAM_NAME) return;
+
+        // Log the raw LiveboardRendered payload — it may contain parameters directly.
+        console.log('[custom-drill] LiveboardRendered payload:', lbPayload);
+        dbg(`LiveboardRendered: <span class="v">${escapeHtml(JSON.stringify(lbPayload).slice(0,200))}</span>`);
+
+        // Attempt 1: parameters may be in the LiveboardRendered payload itself.
+        pickParamFromObject(lbPayload);
+        if (currentGroupByParam) return;
+
+        // Attempt 2: ask the embed for current parameters.
         try {
-            // GetParameters returns { parameters: [{ name, value }, ...] }
             const resp = await embed.trigger(HostEvent.GetParameters);
-            const params = resp?.parameters ?? resp ?? [];
-            dbg(`LiveboardRendered – params: <span class="v">${escapeHtml(JSON.stringify(params))}</span>`);
-            const p = params.find(p => p.name === GROUP_BY_PARAM_NAME);
-            if (p?.value != null) {
-                currentGroupByParam = String(p.value);
-                dbg(`<span class="ok">Group By param updated → "${escapeHtml(currentGroupByParam)}"</span>`);
-            }
+            console.log('[custom-drill] GetParameters raw:', resp);
+            dbg(`GetParameters raw: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
+            pickParamFromObject(resp);
         } catch (e) {
-            // GetParameters may not be available in all SDK versions; that's fine.
-            dbg(`<span class="w">GetParameters not supported (${escapeHtml(String(e))}). ` +
-                `Set currentGroupByParam manually or use a custom parameter control.</span>`);
+            dbg(`<span class="w">GetParameters threw: ${escapeHtml(String(e))}</span>`);
+        }
+
+        if (!currentGroupByParam) {
+            dbg(`<span class="w">⚠ Could not read "${escapeHtml(GROUP_BY_PARAM_NAME)}" parameter automatically. ` +
+                `Call setGroupByParam("&lt;value&gt;") in the browser console, or check the logs above.</span>`);
         }
     });
+
+    // Walk any object looking for a parameter named GROUP_BY_PARAM_NAME.
+    // Handles { parameters:[{name,value}] }, [{name,value}], and flat {name:value} shapes.
+    function pickParamFromObject(obj) {
+        if (!obj) return;
+        // Array of parameter objects
+        const list = obj.parameters ?? obj.data?.parameters ??
+                     obj.runtimeParameters ?? (Array.isArray(obj) ? obj : null);
+        if (Array.isArray(list)) {
+            const hit = list.find(p =>
+                String(p.name ?? p.parameterName ?? p.key ?? '').toLowerCase() ===
+                GROUP_BY_PARAM_NAME.toLowerCase()
+            );
+            const val = hit?.value ?? hit?.parameterValue ?? hit?.currentValue;
+            if (val != null) {
+                currentGroupByParam = String(val);
+                dbg(`<span class="ok">Group By param = "${escapeHtml(currentGroupByParam)}"</span>`);
+                return;
+            }
+        }
+        // Flat { "Group By": "Region" } shape
+        const direct = obj[GROUP_BY_PARAM_NAME];
+        if (direct != null) {
+            currentGroupByParam = String(direct);
+            dbg(`<span class="ok">Group By param (flat) = "${escapeHtml(currentGroupByParam)}"</span>`);
+        }
+    }
 
     // ── Listen for the custom action ────────────────────────────────────────
     embed.on(EmbedEvent.CustomAction, (payload) => {
@@ -360,11 +387,11 @@
         renderFilterBar();
     };
 
-    // Manual override — call from browser console when auto-detection isn't available:
-    //   setGroupByParam('Region')
+    // Manual override — call from browser console if auto-detection fails:
+    //   setGroupByParam('YourDimensionName')
     window.setGroupByParam = function (val) {
         currentGroupByParam = val;
-        dbg(`<span class="ok">currentGroupByParam manually set to "${escapeHtml(val)}"</span>`);
+        dbg(`<span class="ok">currentGroupByParam manually → "${escapeHtml(val)}"</span>`);
     };
 
     function renderFilterBar() {
