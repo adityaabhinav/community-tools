@@ -230,6 +230,43 @@
             : [],
     });
 
+    // ── Auto-sync Group By param from data events ───────────────────────────
+    // EmbedEvent.Data fires on every liveboard render (including after the user
+    // changes a parameter in the ThoughtSpot UI).  If the payload includes
+    // runtimeParameters we read the current "Group By" value from there so the
+    // dropdown and currentGroupByParam stay in sync automatically.
+    embed.on(EmbedEvent.Data, (data) => {
+        console.log('[custom-drill] EmbedEvent.Data:', data);
+        if (!GROUP_BY_PARAM_NAME) return;
+
+        // Try every known location where ThoughtSpot puts runtime parameters.
+        const paramLists = [
+            data?.runtimeParameters,
+            data?.data?.runtimeParameters,
+            data?.embedAnswerData?.runtimeParameters,
+            data?.reportBookData?.runtimeParameters,
+        ].filter(Array.isArray);
+
+        for (const list of paramLists) {
+            const hit = list.find(p =>
+                String(p.name ?? p.parameterName ?? '').toLowerCase() ===
+                GROUP_BY_PARAM_NAME.toLowerCase()
+            );
+            const val = hit?.value ?? hit?.parameterValue;
+            if (val != null) {
+                const strVal = String(val);
+                currentGroupByParam = strVal;
+                // Keep the dropdown in sync with ThoughtSpot's current state.
+                const sel = document.getElementById('group-by-select');
+                if (sel && sel.value !== strVal) sel.value = strVal;
+                dbg(`<span class="ok">Group By synced from data event → "${escapeHtml(strVal)}"</span>`);
+                return;
+            }
+        }
+        // Parameter wasn't in the data payload — log once so we know.
+        dbg(`EmbedEvent.Data fired but no "${escapeHtml(GROUP_BY_PARAM_NAME)}" param found — dropdown remains the source of truth.`);
+    });
+
     embed.on(EmbedEvent.CustomAction, (payload) => {
         const raw = payload?.data ?? payload;
         const id  = raw?.id ?? raw?.actionId ?? '(unknown)';
