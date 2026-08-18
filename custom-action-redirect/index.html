@@ -103,7 +103,7 @@
         console.log('[custom-action-redirect] Full payload:', raw);
 
         if (id !== CUSTOM_ACTION_ID) {
-            dbg(`<span class="w">⚠ id "${escapeHtml(id)}" ≠ CUSTOM_ACTION_ID — ignoring</span>`);
+            dbg(`<span class="w">⚠ id "${escapeHtml(id)}" ≠ "${escapeHtml(CUSTOM_ACTION_ID)}" — ignoring</span>`);
             return;
         }
 
