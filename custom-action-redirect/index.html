@@ -52,7 +52,7 @@
 
 <div id="embed-container"></div>
 
-<div id="debug-panel">
+<div id="debug-panel" class="visible">
     <div id="debug-header">
         <span>Debug log — full payloads in browser console</span>
         <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
@@ -111,12 +111,16 @@
         window.location.href = REDIRECT_URL;
     });
 
+    embed.on(EmbedEvent.LiveboardRendered, () =>
+        dbg('<span class="ok">✔ Liveboard rendered — custom action is ready.</span>')
+    );
+
     embed.on(EmbedEvent.Error, e =>
         dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
     );
 
     embed.render();
-    dbg('<span class="ok">Embed rendered.</span>');
+    dbg(`Waiting for liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function escapeHtml(s) {
