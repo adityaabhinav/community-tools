@@ -145,12 +145,16 @@
     //
     // Set GROUP_BY_COLUMN_NAME to null to skip Group By logic entirely.
 
-    const GROUP_BY_COLUMN_NAME = null;   // e.g. 'Drill Dimension'
-    const GROUP_BY_PARAM_NAME  = null;   // e.g. 'GroupByParam'
-    const GROUP_BY_PARAM_MAP   = {
-        // 'Store':      'Store Name',
-        // 'Department': 'Department Name',
-    };
+    // "Group by field" is the formula column in the viz.
+    // "Group By" is the ThoughtSpot parameter that controls which dimension it shows.
+    // When a drill fires on this column:
+    //   filter column = current value of the "Group By" parameter
+    //   filter value  = the clicked value in "Group by field"
+    const GROUP_BY_COLUMN_NAME = 'Group by field';
+    const GROUP_BY_PARAM_NAME  = 'Group By';
+    // Only populate this if a parameter value string differs from the column
+    // name you want to filter on (e.g. param = 'Store' but column = 'Store Name').
+    const GROUP_BY_PARAM_MAP   = {};
 
     // ════════════════════════════════════════════════════════════════════════
 
