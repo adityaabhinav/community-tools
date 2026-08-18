@@ -107,15 +107,8 @@
             return;
         }
 
-        dbg(`<span class="ok">Opening in new tab: ${escapeHtml(REDIRECT_URL)}</span>`);
-        const a = document.createElement('a');
-        a.href = REDIRECT_URL;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        dbg(`<span class="ok">Opening in new window: ${escapeHtml(REDIRECT_URL)}</span>`);
+        window.open(REDIRECT_URL, '_blank', 'noopener,noreferrer');
     });
 
     embed.on(EmbedEvent.LiveboardRendered, () =>
