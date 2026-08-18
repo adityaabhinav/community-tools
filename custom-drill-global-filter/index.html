@@ -16,42 +16,15 @@
             overflow: hidden;
         }
 
-        /* ── toolbar (Group By selector + active filters) ── */
-        #toolbar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 16px;
-            background: #fff;
-            border-bottom: 1px solid #dde3f0;
-            flex-shrink: 0;
-            flex-wrap: wrap;
-        }
-
-        #group-by-bar {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #333;
-        }
-        #group-by-bar label { font-weight: 600; white-space: nowrap; }
-        #group-by-select {
-            border: 1px solid #c0cce0;
-            border-radius: 4px;
-            padding: 4px 10px;
-            font-size: 13px;
-            background: #fff;
-            cursor: pointer;
-            color: #1a3a6b;
-        }
-        #group-by-select:focus { outline: 2px solid #4a7fd4; }
-
+        /* ── filter bar (hidden until a filter is active) ── */
         #filter-bar {
             display: none;
             align-items: center;
             gap: 8px;
-            flex: 1;
+            padding: 8px 16px;
+            background: #e8f0fe;
+            border-bottom: 1px solid #c5d5f5;
+            flex-shrink: 0;
         }
         #filter-bar.visible { display: flex; }
         #filter-bar .label { font-weight: 600; font-size: 13px; color: #1a3a6b; white-space: nowrap; }
@@ -114,19 +87,10 @@
 </head>
 <body>
 
-<div id="toolbar">
-    <div id="group-by-bar">
-        <label for="group-by-select">Group By:</label>
-        <select id="group-by-select" onchange="onGroupByChange(this.value)">
-            <!-- options are populated from GROUP_BY_OPTIONS below -->
-        </select>
-    </div>
-
-    <div id="filter-bar">
-        <span class="label">Filters:</span>
-        <div id="filter-chips"></div>
-        <button id="clear-all" onclick="clearAllFilters()">Clear all</button>
-    </div>
+<div id="filter-bar">
+    <span class="label">Filters:</span>
+    <div id="filter-chips"></div>
+    <button id="clear-all" onclick="clearAllFilters()">Clear all</button>
 </div>
 
 <div id="embed-container"></div>
@@ -163,21 +127,13 @@
     // ── Group By configuration ────────────────────────────────────────────
     // GROUP_BY_COLUMN_NAME : exact name of the formula column in the viz
     // GROUP_BY_PARAM_NAME  : ThoughtSpot parameter name that drives it
-    // GROUP_BY_OPTIONS     : all possible parameter values, first one = default
-    //                        each entry: { label: 'display text', value: 'param value' }
-    //                        'value' must match exactly what ThoughtSpot expects
     //
     // When the user clicks a data point in GROUP_BY_COLUMN_NAME:
-    //   filter COLUMN = currently selected GROUP_BY_OPTIONS value
-    //   filter VALUE  = the clicked cell value in that column
+    //   filter COLUMN = current value of the "Group By" parameter
+    //                   (read live from ThoughtSpot via HostEvent.GetParameters)
+    //   filter VALUE  = the clicked cell value
     const GROUP_BY_COLUMN_NAME = 'Group by field';
     const GROUP_BY_PARAM_NAME  = 'Group By';
-    const GROUP_BY_OPTIONS = [
-        // ← REPLACE these with your actual parameter values
-        { label: 'Region',     value: 'Region'     },
-        { label: 'Store',      value: 'Store'       },
-        { label: 'Department', value: 'Department'  },
-    ];
 
     // Only needed if a parameter value string differs from the column name to
     // filter on, e.g. param value = 'Store' but column name = 'Store Name'.
@@ -188,32 +144,8 @@
     // ════════════════════════════════════════════════════════════════════════
 
     let activeFilters       = [];
-    // Always reflects the dropdown selection — never null after init.
+    // Set by HostEvent.GetParameters each time the custom action fires.
     let currentGroupByParam = null;
-
-    // ── Build the Group By dropdown ─────────────────────────────────────────
-    const sel = document.getElementById('group-by-select');
-    GROUP_BY_OPTIONS.forEach(opt => {
-        const el = document.createElement('option');
-        el.value       = opt.value;
-        el.textContent = opt.label;
-        sel.appendChild(el);
-    });
-    // Seed currentGroupByParam from the first option immediately.
-    if (GROUP_BY_OPTIONS.length) {
-        currentGroupByParam = GROUP_BY_OPTIONS[0].value;
-        dbg(`<span class="ok">Group By initialised → "${escapeHtml(currentGroupByParam)}"</span>`);
-    }
-
-    // Called whenever the dropdown changes.
-    window.onGroupByChange = function (value) {
-        currentGroupByParam = value;
-        dbg(`<span class="ok">Group By changed → "${escapeHtml(value)}"</span>`);
-        // Sync the new parameter value into the ThoughtSpot embed.
-        embed.trigger(HostEvent.UpdateRuntimeParameters, [
-            { name: GROUP_BY_PARAM_NAME, value },
-        ]);
-    };
 
     // ── SDK init ────────────────────────────────────────────────────────────
     init({
@@ -224,10 +156,6 @@
     const embed = new LiveboardEmbed('#embed-container', {
         liveboardId: LIVEBOARD_ID,
         fullHeight: true,
-        // Start the liveboard with the default Group By parameter.
-        runtimeParameters: GROUP_BY_OPTIONS.length
-            ? [{ name: GROUP_BY_PARAM_NAME, value: GROUP_BY_OPTIONS[0].value }]
-            : [],
     });
 
     embed.on(EmbedEvent.CustomAction, (payload) => {
@@ -265,9 +193,6 @@
                 const paramVal = pickParam(resp, GROUP_BY_PARAM_NAME);
                 if (paramVal != null) {
                     currentGroupByParam = paramVal;
-                    // Keep the dropdown in sync.
-                    const sel = document.getElementById('group-by-select');
-                    if (sel && sel.value !== paramVal) sel.value = paramVal;
                     dbg(`<span class="ok">Group By from GetParameters → "${escapeHtml(paramVal)}"</span>`);
                 } else {
                     dbg(`<span class="w">GetParameters returned no value for "${escapeHtml(GROUP_BY_PARAM_NAME)}" — falling back to dropdown (${escapeHtml(String(currentGroupByParam))})</span>`);
