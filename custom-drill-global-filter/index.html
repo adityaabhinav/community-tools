@@ -13,29 +13,23 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
+        /* ── filter bar ── */
         #filter-bar {
             display: none;
             align-items: center;
             gap: 10px;
-            padding: 10px 16px;
+            padding: 8px 16px;
             background: #e8f0fe;
             border-bottom: 1px solid #c5d5f5;
-            font-size: 14px;
+            font-size: 13px;
+            flex-shrink: 0;
         }
-
         #filter-bar.visible { display: flex; }
-
-        #filter-bar .label { font-weight: 600; color: #1a3a6b; }
-
-        #filter-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            flex: 1;
-        }
-
+        #filter-bar .label { font-weight: 600; color: #1a3a6b; white-space: nowrap; }
+        #filter-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
         .chip {
             background: #fff;
             border: 1px solid #4a7fd4;
@@ -47,41 +41,52 @@
             align-items: center;
             gap: 6px;
         }
-
         .chip button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #666;
-            font-size: 14px;
-            line-height: 1;
-            padding: 0;
+            background: none; border: none; cursor: pointer;
+            color: #888; font-size: 15px; line-height: 1; padding: 0;
         }
-
         .chip button:hover { color: #c00; }
-
         #clear-all {
-            background: none;
-            border: 1px solid #c0392b;
-            border-radius: 4px;
-            color: #c0392b;
-            cursor: pointer;
-            font-size: 12px;
-            padding: 4px 10px;
-            white-space: nowrap;
+            background: none; border: 1px solid #c0392b; border-radius: 4px;
+            color: #c0392b; cursor: pointer; font-size: 12px;
+            padding: 4px 10px; white-space: nowrap;
         }
-
         #clear-all:hover { background: #fdf0ee; }
 
-        #embed-container {
-            flex: 1;
-            width: 100%;
-        }
+        /* ── embed ── */
+        #embed-container { flex: 1; width: 100%; min-height: 0; }
+        #embed-container iframe { width: 100%; height: 100%; border: none; }
 
-        #embed-container iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
+        /* ── debug panel ── */
+        #debug-panel {
+            position: fixed; bottom: 0; right: 0; width: 420px;
+            max-height: 280px; overflow-y: auto;
+            background: #1e1e1e; color: #d4d4d4;
+            font-family: monospace; font-size: 11px;
+            border-top-left-radius: 6px;
+            padding: 0;
+            z-index: 9999;
+            display: none;
+        }
+        #debug-panel.visible { display: block; }
+        #debug-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #333; padding: 6px 10px; position: sticky; top: 0;
+            font-size: 11px; font-weight: bold; color: #ccc;
+        }
+        #debug-header button {
+            background: none; border: none; color: #aaa; cursor: pointer; font-size: 12px;
+        }
+        #debug-log { padding: 6px 10px; }
+        .debug-line { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; }
+        .debug-line .tag { color: #569cd6; margin-right: 4px; }
+        .debug-line .val { color: #ce9178; }
+        .debug-line .ok  { color: #4ec9b0; }
+        .debug-line .warn { color: #dcdcaa; }
+        #debug-toggle {
+            position: fixed; bottom: 8px; right: 8px;
+            background: #333; color: #ccc; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 11px; z-index: 10000;
         }
     </style>
 </head>
@@ -95,6 +100,16 @@
 
 <div id="embed-container"></div>
 
+<!-- debug panel (toggle with the button bottom-right) -->
+<div id="debug-panel">
+    <div id="debug-header">
+        <span>Debug log</span>
+        <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
+    </div>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="document.getElementById('debug-panel').classList.toggle('visible')">Debug</button>
+
 <script type="module">
     import {
         init,
@@ -105,20 +120,51 @@
         RuntimeFilterOp,
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  CONFIGURATION — edit these values to match your ThoughtSpot setup
+    // ════════════════════════════════════════════════════════════════════════
+
     const CLUSTER_URL  = 'https://ps-internal.thoughtspot.cloud';
     const LIVEBOARD_ID = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
 
-    // Match the Action ID configured in ThoughtSpot (Admin > Custom actions).
-    // Adjust this value if the action was saved under a different ID.
-    const CUSTOM_DRILL_ACTION_ID = 'custom-drill';
+    // The Action ID set when the custom action was created in ThoughtSpot
+    // (Admin > Custom actions > your action > Action ID field).
+    // Open the Debug panel and click the action — the fired action ID is printed
+    // there. Update this constant to match.
+    const CUSTOM_DRILL_ACTION_ID = 'curated-drill-down';
 
-    // Runtime filters currently applied to the liveboard
-    let activeFilters = [];
+    // ── Group By field configuration ─────────────────────────────────────
+    // If your viz has a formula column that switches between dimensions based
+    // on a parameter (e.g. "if [GroupParam] = 'Region' then [Region] else [Store]"),
+    // set GROUP_BY_COLUMN_NAME to that formula's column name.
+    //
+    // When a drill fires on this column the handler will:
+    //   1. Look for another attribute in the same data point whose value
+    //      matches the clicked value → use that column as the filter target.
+    //   2. Fall back to GROUP_BY_PARAM_MAP: map the current parameter value
+    //      to the real column name (set currentGroupByParam below or via the
+    //      dropdown if you add one).
+    //   3. Fall back to filtering on the formula column itself.
+    //
+    // Set to null to disable Group By resolution entirely.
+    const GROUP_BY_COLUMN_NAME = null; // e.g. 'Drill Dimension'
+
+    // Map each possible Group By parameter value → actual ThoughtSpot column name
+    const GROUP_BY_PARAM_MAP = {
+        // 'Region':     'Region',
+        // 'Store':      'Store Name',
+        // 'Department': 'Department',
+    };
+
+    // ════════════════════════════════════════════════════════════════════════
+
+    let activeFilters        = [];
+    let currentGroupByParam  = null;   // updated when user changes the Group By control
 
     // ── SDK init ────────────────────────────────────────────────────────────
     init({
         thoughtSpotHost: CLUSTER_URL,
-        authType: AuthType.None,   // relies on the user already being logged in
+        authType: AuthType.None,
     });
 
     const embed = new LiveboardEmbed('#embed-container', {
@@ -126,63 +172,95 @@
         fullHeight: true,
     });
 
-    // ── Listen for the custom action ────────────────────────────────────────
+    // ── Listen for ALL custom actions (not just the target ID) ──────────────
+    // This lets the debug panel show the real action ID even before it's configured.
     embed.on(EmbedEvent.CustomAction, (payload) => {
-        const id = payload?.data?.id ?? payload?.id;
+        // Normalise: some SDK versions pass the data directly, others wrap in { data }
+        const raw  = payload?.data ?? payload;
+        const id   = raw?.id ?? raw?.actionId ?? '(unknown)';
+
+        dbg(`CustomAction fired — id: <span class="val">${escapeHtml(id)}</span>`);
+        dbg(`Full payload: <span class="val">${escapeHtml(JSON.stringify(raw, null, 2).slice(0, 600))}</span>`);
+
         if (id === CUSTOM_DRILL_ACTION_ID) {
-            handleCustomDrill(payload?.data ?? payload);
+            handleCustomDrill(raw);
+        } else {
+            dbg(`<span class="warn">⚠ Action id "${escapeHtml(id)}" does not match CUSTOM_DRILL_ACTION_ID="${escapeHtml(CUSTOM_DRILL_ACTION_ID)}". Update the constant if this is the right action.</span>`);
         }
     });
 
+    embed.on(EmbedEvent.Error, (e) => {
+        dbg(`<span class="warn">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`);
+    });
+
     embed.render();
+    dbg('<span class="ok">Embed rendered. Click the custom action on a data point.</span>');
 
     // ── Custom drill handler ────────────────────────────────────────────────
     function handleCustomDrill(data) {
-        const extracted = extractColumnValue(data);
-        if (!extracted.length) {
-            console.warn('[custom-drill] Could not extract column/value from payload', data);
+        const candidates = extractCandidates(data);
+        dbg(`Candidates extracted: ${escapeHtml(JSON.stringify(candidates))}`);
+
+        if (!candidates.length) {
+            dbg('<span class="warn">⚠ No column/value pairs found in payload.</span>');
             return;
         }
-        // Build one filter per column-value pair extracted from the clicked cell
-        const newFilters = extracted.map(({ columnName, value }) => ({
-            columnName,
-            operator: RuntimeFilterOp.EQ,
-            values: [String(value)],
-        }));
-        applyFilters(newFilters);
+
+        // Resolve each candidate: if it's the Group By formula column, map it
+        // to the actual underlying column.
+        const filters = candidates
+            .map(c => resolveGroupBy(c, candidates))
+            .filter(Boolean)
+            .map(({ columnName, value }) => ({
+                columnName,
+                operator: RuntimeFilterOp.EQ,
+                values: [String(value)],
+            }));
+
+        dbg(`Applying filters: ${escapeHtml(JSON.stringify(filters))}`);
+        applyFilters(filters);
     }
 
-    /**
-     * Tries multiple payload shapes returned by EmbedEvent.CustomAction:
-     *   1. contextMenuPoints (context-menu custom action – most common for drill)
-     *   2. embedAnswerData first row (primary / more-options action)
-     */
-    function extractColumnValue(data) {
+    // ── Payload extraction ──────────────────────────────────────────────────
+    // Returns [{ columnName, value }, ...] from whichever payload shape is present.
+    function extractCandidates(data) {
         const results = [];
 
-        // Shape 1: context menu action
+        // Shape A: context-menu action (right-click on a data point)
         const points = data?.contextMenuPoints?.selectedPoints ?? [];
         if (points.length) {
             const point = points[0];
-            // Attributes (dimensions)
+
             for (const attr of (point.selectedAttributes ?? [])) {
-                if (attr?.column?.name != null && attr?.value != null) {
-                    results.push({ columnName: attr.column.name, value: attr.value });
+                const name = attr?.column?.name ?? attr?.columnName;
+                if (name != null && attr?.value != null) {
+                    results.push({ columnName: name, value: attr.value });
                 }
             }
-            // Measures
-            for (const [name, value] of Object.entries(point.selectedMeasures ?? {})) {
-                results.push({ columnName: name, value });
+
+            // selectedMeasures can be { "Revenue": 12345 } or an array
+            const measures = point.selectedMeasures;
+            if (measures && !Array.isArray(measures)) {
+                for (const [name, value] of Object.entries(measures)) {
+                    results.push({ columnName: name, value });
+                }
+            } else if (Array.isArray(measures)) {
+                for (const m of measures) {
+                    const name = m?.column?.name ?? m?.columnName;
+                    if (name != null && m?.value != null) {
+                        results.push({ columnName: name, value: m.value });
+                    }
+                }
             }
+
             if (results.length) return results;
         }
 
-        // Shape 2: embedAnswerData (full answer payload)
-        const answerData = data?.embedAnswerData;
-        if (answerData?.columns?.length && answerData?.data?.length) {
-            const cols = answerData.columns;
-            const row  = answerData.data[0];
-            cols.forEach((col, i) => {
+        // Shape B: embedAnswerData (primary / more-options action)
+        const ans = data?.embedAnswerData;
+        if (ans?.columns?.length && ans?.data?.length) {
+            const row = ans.data[0];
+            ans.columns.forEach((col, i) => {
                 const name = col?.column?.name ?? col?.name;
                 if (name != null && row[i] != null) {
                     results.push({ columnName: name, value: row[i] });
@@ -193,15 +271,47 @@
         return results;
     }
 
+    // ── Group By resolution ─────────────────────────────────────────────────
+    // If the candidate column is the configured Group By formula column, resolve
+    // it to the actual underlying column to filter on.
+    function resolveGroupBy({ columnName, value }, allCandidates) {
+        if (!GROUP_BY_COLUMN_NAME || columnName !== GROUP_BY_COLUMN_NAME) {
+            // Not a Group By column — use as-is
+            return { columnName, value };
+        }
+
+        // Method 1: find another attribute in the SAME data point whose value
+        // equals the formula value.  Works when the underlying column is also
+        // included in the search.
+        const valueStr = String(value);
+        const match = allCandidates.find(c =>
+            c.columnName !== GROUP_BY_COLUMN_NAME &&
+            String(c.value) === valueStr
+        );
+        if (match) {
+            dbg(`<span class="ok">Group By resolved via value-match → ${escapeHtml(match.columnName)} = ${escapeHtml(valueStr)}</span>`);
+            return { columnName: match.columnName, value };
+        }
+
+        // Method 2: use the parameter→column map and the currently tracked param.
+        if (currentGroupByParam && GROUP_BY_PARAM_MAP[currentGroupByParam]) {
+            const resolvedCol = GROUP_BY_PARAM_MAP[currentGroupByParam];
+            dbg(`<span class="ok">Group By resolved via param map (${escapeHtml(currentGroupByParam)}) → ${escapeHtml(resolvedCol)} = ${escapeHtml(valueStr)}</span>`);
+            return { columnName: resolvedCol, value };
+        }
+
+        // Fallback: filter on the formula column itself.
+        dbg(`<span class="warn">⚠ Group By column could not be resolved to an underlying column. Filtering on formula column "${escapeHtml(columnName)}" directly. Configure GROUP_BY_PARAM_MAP or ensure the underlying column is in the search.</span>`);
+        return { columnName, value };
+    }
+
     // ── Filter management ───────────────────────────────────────────────────
-    function applyFilters(filters) {
-        // Merge: overwrite any existing filter on the same column, keep others
-        filters.forEach(f => {
+    function applyFilters(newFilters) {
+        newFilters.forEach(f => {
             const idx = activeFilters.findIndex(a => a.columnName === f.columnName);
             if (idx >= 0) activeFilters[idx] = f;
             else activeFilters.push(f);
         });
-
         embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
         renderFilterBar();
     }
@@ -227,27 +337,38 @@
             bar.classList.remove('visible');
             return;
         }
-
         bar.classList.add('visible');
         activeFilters.forEach(f => {
             const chip = document.createElement('div');
             chip.className = 'chip';
-            chip.innerHTML = `
-                <span>${escapeHtml(f.columnName)} = <strong>${escapeHtml(f.values[0])}</strong></span>
-                <button title="Remove filter" onclick="window._removeFilter('${escapeAttr(f.columnName)}')">×</button>
-            `;
+            chip.innerHTML =
+                `<span>${escapeHtml(f.columnName)} = <strong>${escapeHtml(f.values[0])}</strong></span>` +
+                `<button title="Remove" onclick="window._removeFilter('${escapeAttr(f.columnName)}')">×</button>`;
             chips.appendChild(chip);
         });
     }
 
-    // Expose removeFilter to inline onclick handlers
     window._removeFilter = removeFilter;
 
+    // ── Helpers ─────────────────────────────────────────────────────────────
     function escapeHtml(str) {
-        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
     function escapeAttr(str) {
         return String(str).replace(/'/g, "\\'");
+    }
+
+    // ── Debug logger ─────────────────────────────────────────────────────────
+    function dbg(html) {
+        console.log('[custom-drill]', html.replace(/<[^>]+>/g, ''));
+        const log  = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.className = 'debug-line';
+        line.innerHTML = `<span class="tag">[${new Date().toLocaleTimeString()}]</span>${html}`;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
     }
 </script>
 </body>
