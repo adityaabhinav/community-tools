@@ -172,62 +172,8 @@
         fullHeight: true,
     });
 
-    // ── Track Group By parameter on every liveboard render ──────────────────
-    // LiveboardRendered fires on initial load AND whenever the liveboard
-    // re-renders (e.g. after the user changes the Group By parameter).
-    embed.on(EmbedEvent.LiveboardRendered, async (lbPayload) => {
-        if (!GROUP_BY_PARAM_NAME) return;
-
-        // Log the raw LiveboardRendered payload — it may contain parameters directly.
-        console.log('[custom-drill] LiveboardRendered payload:', lbPayload);
-        dbg(`LiveboardRendered: <span class="v">${escapeHtml(JSON.stringify(lbPayload).slice(0,200))}</span>`);
-
-        // Attempt 1: parameters may be in the LiveboardRendered payload itself.
-        pickParamFromObject(lbPayload);
-        if (currentGroupByParam) return;
-
-        // Attempt 2: ask the embed for current parameters.
-        try {
-            const resp = await embed.trigger(HostEvent.GetParameters);
-            console.log('[custom-drill] GetParameters raw:', resp);
-            dbg(`GetParameters raw: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
-            pickParamFromObject(resp);
-        } catch (e) {
-            dbg(`<span class="w">GetParameters threw: ${escapeHtml(String(e))}</span>`);
-        }
-
-        if (!currentGroupByParam) {
-            dbg(`<span class="w">⚠ Could not read "${escapeHtml(GROUP_BY_PARAM_NAME)}" parameter automatically. ` +
-                `Call setGroupByParam("&lt;value&gt;") in the browser console, or check the logs above.</span>`);
-        }
-    });
-
-    // Walk any object looking for a parameter named GROUP_BY_PARAM_NAME.
-    // Handles { parameters:[{name,value}] }, [{name,value}], and flat {name:value} shapes.
-    function pickParamFromObject(obj) {
-        if (!obj) return;
-        // Array of parameter objects
-        const list = obj.parameters ?? obj.data?.parameters ??
-                     obj.runtimeParameters ?? (Array.isArray(obj) ? obj : null);
-        if (Array.isArray(list)) {
-            const hit = list.find(p =>
-                String(p.name ?? p.parameterName ?? p.key ?? '').toLowerCase() ===
-                GROUP_BY_PARAM_NAME.toLowerCase()
-            );
-            const val = hit?.value ?? hit?.parameterValue ?? hit?.currentValue;
-            if (val != null) {
-                currentGroupByParam = String(val);
-                dbg(`<span class="ok">Group By param = "${escapeHtml(currentGroupByParam)}"</span>`);
-                return;
-            }
-        }
-        // Flat { "Group By": "Region" } shape
-        const direct = obj[GROUP_BY_PARAM_NAME];
-        if (direct != null) {
-            currentGroupByParam = String(direct);
-            dbg(`<span class="ok">Group By param (flat) = "${escapeHtml(currentGroupByParam)}"</span>`);
-        }
-    }
+    // Parameter is read directly from the custom action payload at click time.
+    // No separate network call needed.
 
     // ── Listen for the custom action ────────────────────────────────────────
     embed.on(EmbedEvent.CustomAction, (payload) => {
@@ -254,6 +200,19 @@
 
     // ── Custom drill handler ─────────────────────────────────────────────────
     function handleCustomDrill(data) {
+        // Read the current Group By parameter value from the payload itself —
+        // no extra network call, guaranteed to reflect the state at click time.
+        if (GROUP_BY_PARAM_NAME) {
+            const paramVal = extractParamValue(data, GROUP_BY_PARAM_NAME);
+            if (paramVal != null) {
+                currentGroupByParam = paramVal;
+                dbg(`<span class="ok">Group By param from payload = "${escapeHtml(paramVal)}"</span>`);
+            } else {
+                dbg(`<span class="w">⚠ "${escapeHtml(GROUP_BY_PARAM_NAME)}" not found in payload. Full payload logged to console.</span>`);
+                console.log('[custom-drill] Full payload (param not found):', data);
+            }
+        }
+
         const candidates = extractCandidates(data);
         dbg(`Candidates: <span class="v">${escapeHtml(JSON.stringify(candidates))}</span>`);
 
@@ -281,6 +240,36 @@
 
         dbg(`Applying: <span class="v">${escapeHtml(JSON.stringify(filters))}</span>`);
         applyFilters(filters);
+    }
+
+    // ── Parameter extraction from custom action payload ──────────────────────
+    // ThoughtSpot may nest the runtime parameters in several different places
+    // depending on the SDK version and action type. Try them all.
+    function extractParamValue(data, paramName) {
+        const nameLower = paramName.toLowerCase();
+
+        // Collect every array that could be a parameter list
+        const candidates = [
+            data?.runtimeParameters,
+            data?.embedAnswerData?.runtimeParameters,
+            data?.embedAnswerData?.parameterValues,
+            data?.reportBookData?.runtimeParameters,
+            data?.contextMenuPoints?.runtimeParameters,
+        ].filter(Array.isArray);
+
+        for (const list of candidates) {
+            const hit = list.find(p =>
+                String(p.name ?? p.parameterName ?? p.key ?? '').toLowerCase() === nameLower
+            );
+            const val = hit?.value ?? hit?.parameterValue ?? hit?.currentValue;
+            if (val != null) return String(val);
+        }
+
+        // Flat key on embedAnswerData: { "Group By": "Region" }
+        const flat = data?.embedAnswerData?.[paramName] ?? data?.[paramName];
+        if (flat != null) return String(flat);
+
+        return null;
     }
 
     // ── Payload extraction ───────────────────────────────────────────────────
