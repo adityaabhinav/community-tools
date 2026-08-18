@@ -98,8 +98,9 @@
 
 <div class="toolbar">
   <label for="param-select">Group By:</label>
-  <!-- option values must match the exact "Group by" parameter values in ThoughtSpot -->
+  <!-- option values must match the exact "Group By" parameter values in ThoughtSpot -->
   <select class="param-select" id="param-select">
+    <option value="Office" selected>Office</option>
     <option value="Product">Product</option>
     <option value="Store">Store</option>
   </select>
@@ -129,14 +130,14 @@
   const LB_ID     = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
 
   // Parameter name exactly as defined in the ThoughtSpot data model
-  const PARAM_NAME = 'Group by';
+  const PARAM_NAME = 'Group By';
 
-  // Maps each value of the "Group by" parameter → the actual worksheet column
+  // Maps each value of the "Group By" parameter → the actual worksheet column
   // to apply the runtime filter on.
-  // ⚠️ Replace the VALUES (right side) with the exact column names from your worksheet.
   const PARAM_TO_COLUMN = {
-    'Product': 'Product',   // ← replace with exact worksheet column name for Product
-    'Store':   'Store',     // ← replace with exact worksheet column name for Store
+    'Office':  'Office',
+    'Product': 'Product',
+    'Store':   'Store',
   };
   // ─────────────────────────────────────────────────────────────────────────
 
