@@ -182,10 +182,21 @@
 
   let triggerCount = 0;
 
-  function showDebug(title, obj) {
+  // Rolling event log — newest first, capped at 6 entries
+  const evLog = [];
+  function logEvent(name, payload) {
+    const ts = new Date().toISOString().slice(11, 23);
+    evLog.unshift({ ts, name, payload });
+    if (evLog.length > 6) evLog.pop();
     $debugPanel.style.display = 'block';
-    $debugTitle.textContent   = title;
-    $debugOutput.textContent  = JSON.stringify(obj, null, 2);
+    $debugTitle.textContent   = `Event log (newest first) — ${evLog.length} entries`;
+    $debugOutput.textContent  = evLog
+      .map(e => `[${e.ts}] ${e.name}\n${JSON.stringify(e.payload, null, 2)}`)
+      .join('\n\n── ── ──\n\n');
+  }
+
+  function showDebug(title, obj) {
+    logEvent(title, obj);
   }
 
   let activeFilters    = [];
@@ -318,6 +329,9 @@
   embed.on(EmbedEvent.Filter, (payload) => {
     if (applyingFilter) return;
 
+    // Log every Filter event — including Pendo — so we can see the full payload
+    logEvent('EmbedEvent.Filter', payload);
+
     const filters = payload?.data?.filters ?? payload?.filters ?? [];
     const groupByFilter = filters.find(f => {
       const name = f.columnName ?? f.column_name ?? f.name ?? '';
@@ -335,6 +349,17 @@
     applyingFilter = true;
     applyRuntimeFilter(actualColumn, value, 'EmbedEvent.Filter');
     setTimeout(() => { applyingFilter = false; }, 1000);
+  });
+
+  // ── Catch-all event logger ───────────────────────────────────────────────
+  // Captures every SDK event so we can see which one fires on a viz click.
+  // Look at the debug panel after clicking a bar — the event name we need
+  // to hook into will appear here.
+  const NOISY_EVENTS = new Set(['pendo::connect', 'Data', 'NoCacheData']);
+  embed.on(EmbedEvent.ALL, (payload) => {
+    const name = payload?.type ?? payload?.data?.type ?? payload?.action ?? 'UNKNOWN';
+    if (NOISY_EVENTS.has(name)) return;
+    logEvent(`SDK:${name}`, payload);
   });
 
   embed
