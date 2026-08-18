@@ -107,12 +107,15 @@
             return;
         }
 
-        dbg(`<span class="ok">Opening in popup: ${escapeHtml(REDIRECT_URL)}</span>`);
-        const w = 1200, h = 800;
-        const left = Math.round((screen.width - w) / 2);
-        const top  = Math.round((screen.height - h) / 2);
-        window.open(REDIRECT_URL, 'ts-redirect-popup',
-            `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+        dbg(`<span class="ok">Opening in new tab: ${escapeHtml(REDIRECT_URL)}</span>`);
+        const a = document.createElement('a');
+        a.href = REDIRECT_URL;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     });
 
     embed.on(EmbedEvent.LiveboardRendered, () =>
