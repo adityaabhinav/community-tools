@@ -221,6 +221,24 @@
         handleCustomDrill(raw);
     });
 
+    // Listen for parameter changes from inside the ThoughtSpot iframe.
+    // EmbedEvent.ParameterValueUpdate fires when the user changes a parameter
+    // via ThoughtSpot's built-in control widget.
+    if (EmbedEvent.ParameterValueUpdate) {
+        embed.on(EmbedEvent.ParameterValueUpdate, (payload) => {
+            console.log('[custom-drill] ParameterValueUpdate:', payload);
+            dbg(`ParameterValueUpdate: <span class="v">${escapeHtml(JSON.stringify(payload))}</span>`);
+            const raw = payload?.data ?? payload;
+            const paramVal = pickParam(raw, GROUP_BY_PARAM_NAME);
+            if (paramVal != null) {
+                currentGroupByParam = paramVal;
+                dbg(`<span class="ok">ParameterValueUpdate → Group By = "${escapeHtml(paramVal)}"</span>`);
+            }
+        });
+    } else {
+        dbg('<span class="w">EmbedEvent.ParameterValueUpdate not in this SDK version — relying on postMessage interceptor</span>');
+    }
+
     embed.on(EmbedEvent.Error, e =>
         dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
     );
