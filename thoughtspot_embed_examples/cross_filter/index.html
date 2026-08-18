@@ -100,9 +100,9 @@
   <label for="param-select">Group By:</label>
   <!-- option values must match the exact "Group By" parameter values in ThoughtSpot -->
   <select class="param-select" id="param-select">
-    <option value="Office" selected>Office</option>
-    <option value="Product">Product</option>
+    <option value="Product" selected>Product</option>
     <option value="Store">Store</option>
+    <option value="Office">Office</option>
   </select>
 
   <div class="divider"></div>
@@ -197,6 +197,8 @@
     fullHeight: true,
     enableVizTransformations: true,
     frameParams: { width: '100%' },
+    // Set initial parameter to match the dropdown default so they stay in sync
+    runtimeParameters: [{ name: PARAM_NAME, value: activeParamValue }],
   });
 
   window.__embed = embed;
@@ -246,28 +248,30 @@
         return;
       }
 
-      // The clicked value (what the user selected on the viz)
+      const attrName     = selectedAttributes[0].name;
       const clickedValue = String(selectedAttributes[0].value);
 
-      // Resolve the REAL column to filter on based on the current parameter value.
-      // e.g. Group By = "Product"  →  filter column "Product"
-      //      Group By = "Store"    →  filter column "Store"
-      const actualColumn = PARAM_TO_COLUMN[activeParamValue];
-
-      if (!actualColumn) {
-        console.warn(`[VizPointClick] No column mapping for param value "${activeParamValue}"`);
-        $status.textContent = `⚠️ No column mapping defined for "${activeParamValue}"`;
-        return;
+      // If the user clicked the derived "Group by field" column, resolve
+      // the actual column via the parameter mapping.
+      // If they clicked a real column (e.g. "product", "store") use it directly.
+      let actualColumn;
+      if (attrName === 'Group by field') {
+        actualColumn = PARAM_TO_COLUMN[activeParamValue];
+        if (!actualColumn) {
+          $status.textContent = `⚠️ No mapping defined for Group By = "${activeParamValue}"`;
+          return;
+        }
+        console.log(`[VizPointClick] derived "Group by field" → param "${activeParamValue}" → column "${actualColumn}"`);
+      } else {
+        actualColumn = attrName;
+        console.log(`[VizPointClick] real attribute "${attrName}" used directly as column`);
       }
 
       const filterPayload = [
         { columnName: actualColumn, operator: RuntimeFilterOp.EQ, values: [clickedValue] },
       ];
 
-      console.log(
-        `[VizPointClick] Group By = "${activeParamValue}"  →  ` +
-        `columnName: "${actualColumn}", value: "${clickedValue}"`
-      );
+      console.log(`[VizPointClick] applying → ${actualColumn} = "${clickedValue}"`);
       console.log('[VizPointClick] Sending UpdateRuntimeFilters:', JSON.stringify(filterPayload));
 
       activeFilters = filterPayload;
