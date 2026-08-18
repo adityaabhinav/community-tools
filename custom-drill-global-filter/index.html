@@ -135,11 +135,9 @@
     const GROUP_BY_COLUMN_NAME = 'Group by field';
     const GROUP_BY_PARAM_NAME  = 'Group By';
 
-    // Only needed if a parameter value string differs from the column name to
-    // filter on, e.g. param value = 'Store' but column name = 'Store Name'.
-    const GROUP_BY_PARAM_MAP = {
-        // 'Store': 'Store Name',
-    };
+    // Only needed if the parameter value string differs from the column name to
+    // filter on. Leave empty if the parameter value matches the column name exactly.
+    const GROUP_BY_PARAM_MAP = {};
 
     // ════════════════════════════════════════════════════════════════════════
 
@@ -245,7 +243,7 @@
             if (val != null) return String(val);
         }
 
-        // Flat key: { "Group By": "Region" }
+        // Flat key: { "Group By": "<value>" }
         const direct = resp[paramName];
         if (direct != null) return String(direct);
 
