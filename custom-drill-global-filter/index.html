@@ -239,6 +239,22 @@
         dbg('<span class="w">EmbedEvent.ParameterValueUpdate not in this SDK version — relying on postMessage interceptor</span>');
     }
 
+    embed.on(EmbedEvent.LiveboardRendered, async () => {
+        dbg('<span class="ok">✔ Liveboard rendered.</span>');
+        // Log what filter chips ThoughtSpot recognizes on this liveboard.
+        if (HostEvent.GetFilters) {
+            try {
+                const resp = await embed.trigger(HostEvent.GetFilters);
+                console.log('[custom-drill] GetFilters:', resp);
+                dbg(`GetFilters (registered chips): <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
+            } catch (e) {
+                dbg(`<span class="w">GetFilters threw: ${escapeHtml(String(e))}</span>`);
+            }
+        } else {
+            dbg('<span class="w">HostEvent.GetFilters not in SDK</span>');
+        }
+    });
+
     embed.on(EmbedEvent.Error, e =>
         dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
     );
