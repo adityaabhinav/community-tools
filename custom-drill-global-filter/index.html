@@ -371,7 +371,7 @@
 
     // ── Filter management ────────────────────────────────────────────────────
     function triggerFilters(filters) {
-        embed.trigger(HostEvent.UpdateRuntimeFilters, filters);
+        embed.trigger(HostEvent.UpdateFilters, { filters });
     }
 
     function applyFilters(newFilters) {
