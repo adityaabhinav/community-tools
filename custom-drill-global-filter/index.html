@@ -379,24 +379,36 @@
     }
 
     // ── Filter management ────────────────────────────────────────────────────
+    // Use UpdateFilters (native liveboard filter panel) when available,
+    // falling back to UpdateRuntimeFilters for older SDK versions.
+    function triggerFilters(filters) {
+        if (HostEvent.UpdateFilters) {
+            dbg(`<span class="ok">Using HostEvent.UpdateFilters (native panel)</span>`);
+            embed.trigger(HostEvent.UpdateFilters, { filters });
+        } else {
+            dbg('<span class="w">HostEvent.UpdateFilters unavailable — using UpdateRuntimeFilters</span>');
+            embed.trigger(HostEvent.UpdateRuntimeFilters, filters);
+        }
+    }
+
     function applyFilters(newFilters) {
         newFilters.forEach(f => {
             const i = activeFilters.findIndex(a => a.columnName === f.columnName);
             if (i >= 0) activeFilters[i] = f; else activeFilters.push(f);
         });
-        embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
+        triggerFilters(activeFilters);
         renderFilterBar();
     }
 
     function removeFilter(columnName) {
         activeFilters = activeFilters.filter(f => f.columnName !== columnName);
-        embed.trigger(HostEvent.UpdateRuntimeFilters, activeFilters);
+        triggerFilters(activeFilters);
         renderFilterBar();
     }
 
     window.clearAllFilters = function () {
         activeFilters = [];
-        embed.trigger(HostEvent.UpdateRuntimeFilters, []);
+        triggerFilters([]);
         renderFilterBar();
     };
 
