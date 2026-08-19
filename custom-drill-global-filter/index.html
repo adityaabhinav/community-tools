@@ -170,7 +170,7 @@
             const hit = paramList.find(p =>
                 String(p.name ?? p.parameterName ?? p.key ?? '').toLowerCase() === nameLower
             );
-            const val = hit?.value ?? hit?.parameterValue ?? hit?.currentValue;
+            const val = hit?.overrideValue ?? hit?.value ?? hit?.parameterValue ?? hit?.currentValue ?? hit?.defaultValue;
             if (val != null) {
                 const strVal = String(val);
                 if (strVal !== currentGroupByParam) {
@@ -309,7 +309,7 @@
             const hit = list.find(p =>
                 String(p.name ?? p.parameterName ?? p.key ?? '').toLowerCase() === nameLower
             );
-            const val = hit?.value ?? hit?.parameterValue ?? hit?.currentValue;
+            const val = hit?.overrideValue ?? hit?.value ?? hit?.parameterValue ?? hit?.currentValue ?? hit?.defaultValue;
             if (val != null) return String(val);
         }
 
