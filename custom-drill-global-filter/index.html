@@ -325,6 +325,7 @@
         const out = [];
 
         // Shape A: context-menu action (right-click on a data point)
+        // Only extract attributes (dimensions) — measures are not useful as filters.
         const points = data?.contextMenuPoints?.selectedPoints ?? [];
         if (points.length) {
             const pt = points[0];
@@ -332,16 +333,6 @@
                 const name = attr?.column?.name ?? attr?.columnName;
                 if (name != null && attr?.value != null)
                     out.push({ columnName: name, value: attr.value });
-            }
-            const measures = pt.selectedMeasures;
-            if (measures && !Array.isArray(measures)) {
-                for (const [name, value] of Object.entries(measures))
-                    out.push({ columnName: name, value });
-            } else if (Array.isArray(measures)) {
-                for (const m of measures) {
-                    const name = m?.column?.name ?? m?.columnName;
-                    if (name != null && m?.value != null) out.push({ columnName: name, value: m.value });
-                }
             }
             if (out.length) return out;
         }
@@ -379,16 +370,8 @@
     }
 
     // ── Filter management ────────────────────────────────────────────────────
-    // Use UpdateFilters (native liveboard filter panel) when available,
-    // falling back to UpdateRuntimeFilters for older SDK versions.
     function triggerFilters(filters) {
-        if (HostEvent.UpdateFilters) {
-            dbg(`<span class="ok">Using HostEvent.UpdateFilters (native panel)</span>`);
-            embed.trigger(HostEvent.UpdateFilters, { filters });
-        } else {
-            dbg('<span class="w">HostEvent.UpdateFilters unavailable — using UpdateRuntimeFilters</span>');
-            embed.trigger(HostEvent.UpdateRuntimeFilters, filters);
-        }
+        embed.trigger(HostEvent.UpdateRuntimeFilters, filters);
     }
 
     function applyFilters(newFilters) {
