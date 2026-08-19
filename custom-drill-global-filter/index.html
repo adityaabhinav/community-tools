@@ -279,7 +279,9 @@
             return;
         }
 
+        // Only keep the Group By column — skip measures and unrelated columns.
         const filters = candidates
+            .filter(c => !GROUP_BY_COLUMN_NAME || c.columnName === GROUP_BY_COLUMN_NAME)
             .map(c => resolveFilter(c))
             .filter(Boolean)
             .map(({ columnName, value }) => ({
