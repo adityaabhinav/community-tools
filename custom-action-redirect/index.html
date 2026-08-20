@@ -95,12 +95,16 @@
         const msg = event.data;
         if (!msg || typeof msg !== 'object') return;
 
+        // Log ALL messages from ThoughtSpot so we can find the filter shape.
+        const type = msg?.type ?? msg?.eventType ?? msg?.name ?? '?';
+        console.log('[custom-action-redirect] postMessage type=' + type, msg);
+
         // Search all known filter list shapes in the message.
         const candidates = [
             msg?.payload?.filters, msg?.payload?.runtimeFilters,
-            msg?.payload?.appliedFilters,
+            msg?.payload?.appliedFilters, msg?.payload?.liveboardFilters,
             msg?.data?.filters, msg?.data?.runtimeFilters,
-            msg?.data?.appliedFilters,
+            msg?.data?.appliedFilters, msg?.data?.liveboardFilters,
             msg?.filters, msg?.runtimeFilters, msg?.appliedFilters,
         ];
         for (const list of candidates) {
@@ -129,7 +133,8 @@
         const id  = raw?.id ?? raw?.actionId ?? '(unknown)';
 
         dbg(`CustomAction fired — id: <span class="v">${escapeHtml(id)}</span>`);
-        console.log('[custom-action-redirect] Full payload:', raw);
+        console.log('[custom-action-redirect] Full payload:', JSON.parse(JSON.stringify(raw)));
+        dbg(`Payload keys: <span class="v">${escapeHtml(Object.keys(raw ?? {}).join(', '))}</span>`);
 
         if (id !== CUSTOM_ACTION_ID) {
             dbg(`<span class="w">⚠ id "${escapeHtml(id)}" ≠ "${escapeHtml(CUSTOM_ACTION_ID)}" — ignoring</span>`);
