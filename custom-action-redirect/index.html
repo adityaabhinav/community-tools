@@ -86,6 +86,34 @@
 
     // ════════════════════════════════════════════════════════════════════════
 
+    // Track the liveboard's applied filters via ThoughtSpot's postMessage traffic.
+    // GetFilters only returns host-set filters; this captures UI-applied ones too.
+    let capturedFilters = [];
+
+    window.addEventListener('message', (event) => {
+        if (!event.origin.startsWith(CLUSTER_URL)) return;
+        const msg = event.data;
+        if (!msg || typeof msg !== 'object') return;
+
+        // Search all known filter list shapes in the message.
+        const candidates = [
+            msg?.payload?.filters, msg?.payload?.runtimeFilters,
+            msg?.payload?.appliedFilters,
+            msg?.data?.filters, msg?.data?.runtimeFilters,
+            msg?.data?.appliedFilters,
+            msg?.filters, msg?.runtimeFilters, msg?.appliedFilters,
+        ];
+        for (const list of candidates) {
+            if (!Array.isArray(list) || !list.length) continue;
+            const parsed = parseFilters(list);
+            if (!parsed.length) continue;
+            capturedFilters = parsed;
+            console.log('[custom-action-redirect] postMessage filters captured:', parsed);
+            dbg(`postMessage → filters updated: <span class="v">${escapeHtml(JSON.stringify(parsed))}</span>`);
+            break;
+        }
+    });
+
     init({
         thoughtSpotHost: CLUSTER_URL,
         authType: AuthType.None,
@@ -113,13 +141,19 @@
         if (HostEvent.GetFilters) {
             try {
                 const resp = await embed.trigger(HostEvent.GetFilters);
-                console.log('[custom-action-redirect] GetFilters:', resp);
+                console.log('[custom-action-redirect] GetFilters raw:', resp);
+                dbg(`GetFilters raw: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
                 activeFilters = parseFilters(resp);
-                dbg(`Current filters: <span class="v">${escapeHtml(JSON.stringify(activeFilters))}</span>`);
             } catch (e) {
                 dbg(`<span class="w">GetFilters threw: ${escapeHtml(String(e))}</span>`);
             }
         }
+        // Fall back to postMessage-intercepted filters if GetFilters returned nothing.
+        if (!activeFilters.length && capturedFilters.length) {
+            activeFilters = capturedFilters;
+            dbg(`<span class="ok">Using postMessage-captured filters as fallback</span>`);
+        }
+        dbg(`Applying filters to redirect: <span class="v">${escapeHtml(JSON.stringify(activeFilters))}</span>`);
 
         const url = appendRuntimeFilters(REDIRECT_URL, activeFilters);
         dbg(`<span class="ok">Opening: ${escapeHtml(url)}</span>`);
