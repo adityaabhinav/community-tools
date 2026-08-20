@@ -107,8 +107,8 @@
             return;
         }
 
-        dbg(`<span class="ok">Opening in new window: ${escapeHtml(REDIRECT_URL)}</span>`);
-        window.open(REDIRECT_URL, '_blank', 'noopener,noreferrer');
+        dbg(`<span class="ok">Opening in new tab: ${escapeHtml(REDIRECT_URL)}</span>`);
+        window.open(REDIRECT_URL, '_blank');
     });
 
     embed.on(EmbedEvent.LiveboardRendered, () =>
