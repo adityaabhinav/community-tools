@@ -67,6 +67,7 @@
         LiveboardEmbed,
         AuthType,
         EmbedEvent,
+        HostEvent,
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
     // ════════════════════════════════════════════════════════════════════════
@@ -95,7 +96,7 @@
         fullHeight: true,
     });
 
-    embed.on(EmbedEvent.CustomAction, (payload) => {
+    embed.on(EmbedEvent.CustomAction, async (payload) => {
         const raw = payload?.data ?? payload;
         const id  = raw?.id ?? raw?.actionId ?? '(unknown)';
 
@@ -107,8 +108,22 @@
             return;
         }
 
-        dbg(`<span class="ok">Opening in new tab: ${escapeHtml(REDIRECT_URL)}</span>`);
-        window.open(REDIRECT_URL, '_blank');
+        // Capture current liveboard filters and carry them to the destination.
+        let activeFilters = [];
+        if (HostEvent.GetFilters) {
+            try {
+                const resp = await embed.trigger(HostEvent.GetFilters);
+                console.log('[custom-action-redirect] GetFilters:', resp);
+                activeFilters = parseFilters(resp);
+                dbg(`Current filters: <span class="v">${escapeHtml(JSON.stringify(activeFilters))}</span>`);
+            } catch (e) {
+                dbg(`<span class="w">GetFilters threw: ${escapeHtml(String(e))}</span>`);
+            }
+        }
+
+        const url = appendRuntimeFilters(REDIRECT_URL, activeFilters);
+        dbg(`<span class="ok">Opening: ${escapeHtml(url)}</span>`);
+        window.open(url, '_blank');
     });
 
     embed.on(EmbedEvent.LiveboardRendered, () =>
@@ -121,6 +136,35 @@
 
     embed.render();
     dbg(`Waiting for liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
+
+    // ── Filter helpers ───────────────────────────────────────────────────────
+    // Normalise GetFilters response into [{columnName, operator, values}].
+    function parseFilters(resp) {
+        if (!resp) return [];
+        const list = Array.isArray(resp) ? resp
+                   : (resp.filters ?? resp.runtimeFilters ?? resp.appliedFilters ?? []);
+        return list.map(f => ({
+            columnName: f.columnName ?? f.column?.name ?? f.name ?? '',
+            operator:   f.operator   ?? f.filterType   ?? 'EQ',
+            values:     Array.isArray(f.values) ? f.values.map(String) :
+                        (f.value != null ? [String(f.value)] : []),
+        })).filter(f => f.columnName && f.values.length);
+    }
+
+    // Append ThoughtSpot runtime filter params to a URL.
+    // Uses col1/op1/val1 … format that ThoughtSpot's SPA router understands.
+    function appendRuntimeFilters(baseUrl, filters) {
+        if (!filters.length) return baseUrl;
+        const params = [];
+        filters.forEach((f, i) => {
+            const n = i + 1;
+            params.push(`col${n}=${encodeURIComponent(f.columnName)}`);
+            params.push(`op${n}=${encodeURIComponent(f.operator)}`);
+            f.values.forEach(v => params.push(`val${n}=${encodeURIComponent(v)}`));
+        });
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        return baseUrl + sep + params.join('&');
+    }
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function escapeHtml(s) {
