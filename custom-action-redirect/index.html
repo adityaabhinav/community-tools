@@ -180,6 +180,27 @@
     // Normalise GetFilters response into [{columnName, operator, values}].
     function parseFilters(resp) {
         if (!resp) return [];
+
+        // Handle GetFilters liveboardFilters shape:
+        // { liveboardFilters: [{ columnInfo: {name}, filters: [{filterContent: [{filterType, value: [{key}]}]}] }] }
+        if (resp.liveboardFilters) {
+            const result = [];
+            for (const group of resp.liveboardFilters) {
+                const colName = group.columnInfo?.name;
+                if (!colName) continue;
+                const content = group.filters?.[0]?.filterContent?.[0];
+                if (!content) continue;
+                const values = (content.value ?? [])
+                    .map(v => String(v.key ?? v))
+                    .filter(v => v !== '');
+                if (!values.length) continue;
+                const operator = content.filterType ?? 'EQ';
+                result.push({ columnName: colName, operator, values });
+            }
+            return result;
+        }
+
+        // Fallback: flat array or legacy shapes
         const list = Array.isArray(resp) ? resp
                    : (resp.filters ?? resp.runtimeFilters ?? resp.appliedFilters ?? []);
         return list.map(f => ({
