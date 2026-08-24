@@ -90,8 +90,11 @@
         path: `pinboard/${LIVEBOARD_ID}`,
         fullHeight: true,
         hiddenActions: [
-            Action.MoveToTab,   // "Move to" — move viz to another tab
-            Action.TileSize,    // "Tile size" — resize options
+            'tileSize',    // Tile size toolbar button
+            'moveToTab',   // Move to tab option
+            // Also try alternate casing used in older SDK versions
+            'TILE_SIZE',
+            'MOVE_TO_TAB',
         ],
     });
 
@@ -102,6 +105,16 @@
     embed.on(EmbedEvent.Error, e =>
         dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
     );
+
+    // Log ALL postMessages from ThoughtSpot so we can spot the exact action IDs
+    // for Tile Size and Move To — look for type/actionType fields in browser console.
+    window.addEventListener('message', (event) => {
+        if (!event.origin.startsWith(CLUSTER_URL)) return;
+        const msg = event.data;
+        if (!msg || typeof msg !== 'object') return;
+        const type = msg?.type ?? msg?.eventType ?? msg?.name ?? '';
+        if (type) console.log('[liveboard-editor] postMessage type=' + type, msg);
+    });
 
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> via AppEmbed …`);
