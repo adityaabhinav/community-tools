@@ -88,6 +88,10 @@
     const embed = new LiveboardEmbed('#embed-container', {
         liveboardId: LIVEBOARD_ID,
         fullHeight: true,
+        hiddenActions: [
+            'tileSize',   // Action.TileSize  — hides the resize toolbar button
+            'moveToTab',  // Action.MoveToTab — hides the move-to-tab button
+        ],
     });
 
     embed.on(EmbedEvent.LiveboardRendered, () =>
@@ -100,11 +104,6 @@
 
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
-    try {
-        dbg(`Action keys: <span class="v">${escapeHtml(Object.keys(Action ?? {}).join(', '))}</span>`);
-    } catch(e) {
-        dbg(`<span class="w">Action inspect error: ${escapeHtml(String(e))}</span>`);
-    }
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function escapeHtml(s) {
