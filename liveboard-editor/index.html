@@ -80,14 +80,11 @@
 <script type="module">
     import {
         init,
-        AppEmbed,
+        LiveboardEmbed,
         AuthType,
         EmbedEvent,
-        Action,
         HostEvent,
-    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
-
-    const NAVIGATE = HostEvent?.Navigate ?? 'navigate';
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk@1.51.0/dist/tsembed.es.js';
 
     // ════════════════════════════════════════════════════════════════════════
     //  CONFIGURATION — edit these values
@@ -103,40 +100,21 @@
         authType: AuthType.None,
     });
 
-    // AppEmbed gives the full ThoughtSpot app experience, which includes
-    // all native edit-mode controls like deleting individual viz tiles.
-    const embed = new AppEmbed('#embed-container', {
-        path: `pinboard/${LIVEBOARD_ID}`,
+    const embed = new LiveboardEmbed('#embed-container', {
+        liveboardId: LIVEBOARD_ID,
         fullHeight: true,
-        hiddenActions: [
-            'tileSize',    // Tile size toolbar button
-            'moveToTab',   // Move to tab option
-            // Also try alternate casing used in older SDK versions
-            'TILE_SIZE',
-            'MOVE_TO_TAB',
-        ],
     });
 
-    embed.on(EmbedEvent.RouteChange, e =>
-        dbg(`<span class="ok">Route: ${escapeHtml(JSON.stringify(e?.data ?? e))}</span>`)
+    embed.on(EmbedEvent.LiveboardRendered, () =>
+        dbg('<span class="ok">✔ Liveboard rendered.</span>')
     );
 
     embed.on(EmbedEvent.Error, e =>
         dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
     );
 
-    // Log ALL postMessages from ThoughtSpot so we can spot the exact action IDs
-    // for Tile Size and Move To — look for type/actionType fields in browser console.
-    window.addEventListener('message', (event) => {
-        if (!event.origin.startsWith(CLUSTER_URL)) return;
-        const msg = event.data;
-        if (!msg || typeof msg !== 'object') return;
-        const type = msg?.type ?? msg?.eventType ?? msg?.name ?? '';
-        if (type) console.log('[liveboard-editor] postMessage type=' + type, msg);
-    });
-
     embed.render();
-    dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> via AppEmbed …`);
+    dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
 
     // ── Edit button ──────────────────────────────────────────────────────────
     let isEditing = false;
@@ -150,15 +128,11 @@
     document.getElementById('editBtn').addEventListener('click', () =>
         debounceFunc(() => {
             isEditing = !isEditing;
-            // Navigate to the edit-mode or view-mode path of the same liveboard.
-            const path = isEditing
-                ? `pinboard/${LIVEBOARD_ID}?isEditMode=true`
-                : `pinboard/${LIVEBOARD_ID}`;
-            embed.trigger(NAVIGATE, { path });
+            embed.trigger(HostEvent.SetEditMode, { editMode: isEditing });
             const btn = document.getElementById('editBtn');
             btn.textContent = isEditing ? 'Done Editing' : 'Edit Liveboard';
             btn.classList.toggle('editing', isEditing);
-            dbg(`Navigate → <span class="v">${path}</span>`);
+            dbg(`SetEditMode → <span class="v">${isEditing}</span>`);
         })
     );
 
