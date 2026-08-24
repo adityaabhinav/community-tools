@@ -68,6 +68,7 @@
         LiveboardEmbed,
         AuthType,
         EmbedEvent,
+        Action,
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk@1.51.0/dist/tsembed.es.js';
 
     // ════════════════════════════════════════════════════════════════════════
@@ -99,6 +100,11 @@
 
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
+    try {
+        dbg(`Action keys: <span class="v">${escapeHtml(Object.keys(Action ?? {}).join(', '))}</span>`);
+    } catch(e) {
+        dbg(`<span class="w">Action inspect error: ${escapeHtml(String(e))}</span>`);
+    }
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function escapeHtml(s) {
