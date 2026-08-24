@@ -34,16 +34,12 @@ TS_HOST=https://your-cluster.thoughtspot.cloud
 TS_USERNAME=your.name@thoughtspot.com
 TS_PASSWORD=your_password
 TS_WORKSHEET_ID=your_worksheet_uuid
-TS_TOKEN=your_bearer_token       # required for Direct MCP, Claude+MCP, and chart iframes
 ANTHROPIC_API_KEY=sk-ant-...     # required for "Claude + MCP" mode only
 TS_ORG_ID=                       # optional — numeric org id for multi-org clusters
+TS_TOKEN=                        # optional — auto-fetched from credentials if blank
 ```
 
-The app authenticates to the ThoughtSpot REST API via **session cookie** (username + password). A separate **bearer token** (`TS_TOKEN`) is needed for two things:
-1. The ThoughtSpot MCP server (`agent.thoughtspot.app/token/mcp`) — used by Direct MCP and Claude+MCP modes.
-2. The Embed SDK iframe renderer — so charts can render in the browser.
-
-Generate `TS_TOKEN` from the ThoughtSpot Developer Playground, or via `POST /api/rest/2.0/auth/token/full` with your secret key.
+The app authenticates via **session cookie** (username + password). A bearer token is also needed for the ThoughtSpot MCP server and the Embed SDK iframe renderer — the backend fetches it automatically from `POST /api/rest/2.0/auth/token/full` using the same credentials, so you don't need to set `TS_TOKEN` manually. Set it only if you want to pin a specific token.
 
 `TS_WORKSHEET_ID` is the default data source Spotter queries. You can also pick a model per-question in the UI, or choose **Auto** to let Spotter select the dataset.
 

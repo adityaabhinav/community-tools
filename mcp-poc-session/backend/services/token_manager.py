@@ -1,11 +1,14 @@
 """
-Token manager — session-cookie auth for ps-internal cluster.
+Token manager — session-cookie auth + auto-fetched bearer token.
 
-Instead of a bearer token, we authenticate once via username+password,
-let ThoughtSpot set a session cookie, and reuse that cookie for all
-subsequent API calls. No TS_TOKEN or TS_SECRET_KEY needed.
+Authentication flow:
+  1. POST /auth/session/login  — sets JSESSIONID cookie used by all REST calls.
+  2. POST /auth/token/full     — fetches a bearer token using the same credentials.
+     The bearer token is used by the ThoughtSpot MCP server and the Embed SDK
+     (iframe auth). It is refreshed automatically whenever login() is called.
 
-On 401, automatically re-authenticates and retries.
+Only TS_HOST, TS_USERNAME, and TS_PASSWORD are required in .env.
+TS_TOKEN is optional — if set, it overrides the auto-fetched token.
 """
 
 import os
@@ -23,18 +26,47 @@ _TS_ORG_ID  = os.getenv("TS_ORG_ID")
 # In-memory session cookie jar — shared across all requests.
 _session_cookies: dict[str, str] = {}
 
+# Bearer token — auto-fetched after login, or overridden by TS_TOKEN in .env.
+_TS_TOKEN: str = os.getenv("TS_TOKEN", "")
+
 
 def get_cookies() -> dict[str, str]:
     return _session_cookies
 
 
+async def _fetch_bearer_token(client: httpx.AsyncClient) -> str:
+    """
+    POST /api/rest/2.0/auth/token/full with username+password to get a bearer
+    token. Called automatically after a successful session login so callers
+    never have to set TS_TOKEN manually.
+    """
+    url = f"{TS_HOST}/api/rest/2.0/auth/token/full"
+    payload: dict = {
+        "username": TS_USERNAME,
+        "password": TS_PASSWORD,
+        "validity_time_in_sec": 86400,   # 24 h; re-fetched on every login()
+    }
+    if _TS_ORG_ID:
+        payload["org_id"] = int(_TS_ORG_ID)
+    try:
+        resp = await client.post(url, json=payload, timeout=15)
+        if resp.status_code == 200:
+            token = resp.json().get("token", "")
+            logger.info("Bearer token fetched successfully")
+            return token
+        else:
+            logger.warning(f"Bearer token fetch failed: {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        logger.warning(f"Bearer token fetch error: {e}")
+    return ""
+
+
 async def login() -> bool:
     """
-    POST /api/rest/2.0/auth/session/login with username+password.
-    ThoughtSpot sets JSESSIONID (and optionally clientId) as cookies.
-    We capture and reuse them for every subsequent call.
+    1. POST /auth/session/login  → captures session cookies.
+    2. POST /auth/token/full     → fetches bearer token for MCP + Embed SDK.
     """
-    global _session_cookies
+    global _session_cookies, _TS_TOKEN
     url = f"{TS_HOST}/api/rest/2.0/auth/session/login"
     payload: dict = {
         "username": TS_USERNAME,
@@ -47,10 +79,12 @@ async def login() -> bool:
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(url, json=payload, timeout=15)
-            if resp.status_code == 204 or resp.status_code == 200:
-                # Capture all cookies ThoughtSpot set
+            if resp.status_code in (200, 204):
                 _session_cookies = dict(resp.cookies)
                 logger.info(f"Session login succeeded — cookies: {list(_session_cookies.keys())}")
+                # Only auto-fetch if TS_TOKEN wasn't pinned in .env
+                if not os.getenv("TS_TOKEN"):
+                    _TS_TOKEN = await _fetch_bearer_token(client)
                 return True
             else:
                 logger.error(f"Session login failed: {resp.status_code} {resp.text}")
@@ -67,7 +101,6 @@ async def ensure_session() -> bool:
     return await login()
 
 
-# Kept for compatibility with existing code that calls refresh_token()
 async def refresh_token() -> Optional[str]:
     success = await login()
     return "session" if success else None
@@ -87,18 +120,12 @@ async def check_token_valid() -> dict:
             if resp.status_code == 200:
                 return {"valid": True, "user": resp.json().get("name", TS_USERNAME)}
             elif resp.status_code == 401:
-                # Session expired — re-login
                 ok = await login()
                 return {"valid": ok, "reason": None if ok else "Re-login failed"}
             else:
                 return {"valid": False, "reason": f"Status {resp.status_code}"}
     except Exception as e:
         return {"valid": False, "reason": str(e)}
-
-
-# Bearer token for MCP server auth (needed for Direct MCP and Claude+MCP modes).
-# Format expected by agent.thoughtspot.app/token/mcp: {token}@{ts_domain}
-_TS_TOKEN = os.getenv("TS_TOKEN", "")
 
 
 def get_token() -> Optional[str]:
