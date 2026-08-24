@@ -116,14 +116,7 @@
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
 
-    try {
-        dbg(`HostEvent type: <span class="v">${escapeHtml(typeof HostEvent)}</span> — keys: <span class="v">${escapeHtml(JSON.stringify(Object.keys(HostEvent ?? {})))}</span>`);
-    } catch(e) {
-        dbg(`<span class="w">HostEvent inspect error: ${escapeHtml(String(e))}</span>`);
-    }
-
     // ── Edit button ──────────────────────────────────────────────────────────
-    let isEditing = false;
     let editDebounceTimer = null;
 
     function debounceFunc(fn, delay = 300) {
@@ -133,14 +126,8 @@
 
     document.getElementById('editBtn').addEventListener('click', () =>
         debounceFunc(() => {
-            isEditing = !isEditing;
-            // HostEvent is a const enum — values aren't available at runtime.
-            // Use the raw string the SDK uses internally.
-            embed.trigger(HostEvent.SetEditMode ?? 'setEditMode', { editMode: isEditing });
-            const btn = document.getElementById('editBtn');
-            btn.textContent = isEditing ? 'Done Editing' : 'Edit Liveboard';
-            btn.classList.toggle('editing', isEditing);
-            dbg(`SetEditMode → <span class="v">${isEditing}</span>`);
+            embed.trigger(HostEvent.Edit);
+            dbg(`<span class="ok">HostEvent.Edit triggered</span>`);
         })
     );
 
