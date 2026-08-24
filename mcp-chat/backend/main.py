@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from services.ts_mcp_client import run_query_stream
 from services.ts_tool import run_api_stream, reconstruct_conversation, list_models
 from services.claude_agent import chat as claude_chat
-from services.token_manager import check_token_valid, refresh_token, _set_token
+from services.token_manager import check_token_valid, refresh_token, _set_token, get_token
 from services.db import init_db, save_item, get_conversations
 
 app = FastAPI()
@@ -34,6 +34,21 @@ app.add_middleware(
 )
 
 init_db()
+
+
+@app.on_event("startup")
+async def auto_login():
+    """Auto-generate a token on startup when TS_TOKEN is not set in .env.
+    Requires TS_USERNAME + TS_PASSWORD (or TS_SECRET_KEY) to be configured."""
+    if not get_token():
+        logging.info("No TS_TOKEN in env — attempting auto-login with username/password…")
+        token = await refresh_token()
+        if token:
+            logging.info("Auto-login succeeded.")
+        else:
+            logging.warning(
+                "Auto-login failed. Set TS_TOKEN, or add TS_USERNAME + TS_PASSWORD to .env"
+            )
 
 
 class ChatRequest(BaseModel):

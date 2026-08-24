@@ -13,13 +13,13 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 TS_HOST = os.getenv("TS_HOST")
-TS_USERNAME = os.getenv("TS_USERNAME", "anuj.seth")
+TS_USERNAME = os.getenv("TS_USERNAME")
 TS_SECRET_KEY = os.getenv("TS_SECRET_KEY")  # ThoughtSpot trusted auth secret key
 TS_PASSWORD = os.getenv("TS_PASSWORD")       # fallback: plain password auth
 _TS_ORG_ID = os.getenv("TS_ORG_ID")         # optional: required for multi-org clusters
 
-# In-memory token cache (starts with the static token from .env)
-_current_token: Optional[str] = os.getenv("TS_TOKEN")
+# In-memory token cache (starts with the static token from .env, if provided)
+_current_token: Optional[str] = os.getenv("TS_TOKEN") or None
 
 
 def get_token() -> Optional[str]:
