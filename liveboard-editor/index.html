@@ -67,7 +67,6 @@
         LiveboardEmbed,
         AuthType,
         EmbedEvent,
-        Action,
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
     // ════════════════════════════════════════════════════════════════════════
@@ -87,27 +86,8 @@
     const embed = new LiveboardEmbed('#embed-container', {
         liveboardId: LIVEBOARD_ID,
         fullHeight: true,
-
-        // Expose edit + per-viz remove/delete actions.
-        // All other actions remain at their default visibility.
-        visibleActions: [
-            Action.Edit,             // "Edit liveboard" — opens edit mode
-            Action.Remove,           // "Delete" on each viz tile (removes from liveboard)
-            Action.AddToFavorites,
-            Action.Share,
-            Action.MakeACopy,
-            Action.DownloadAsCsv,
-            Action.DownloadAsPdf,
-            Action.DownloadAsXlsx,
-            Action.Save,
-            Action.Cancel,
-            Action.Present,
-            Action.EditTitle,
-            Action.Explore,
-            Action.Pin,
-            Action.EditDetails,
-            Action.SpotIQAnalyze,
-        ],
+        // No visibleActions/hiddenActions — show all default ThoughtSpot actions
+        // including Edit liveboard and Delete viz tile.
     });
 
     embed.on(EmbedEvent.LiveboardRendered, () =>
