@@ -46,10 +46,26 @@
             background: #333; color: #ccc; border: none; border-radius: 4px;
             padding: 4px 10px; cursor: pointer; font-size: 11px; z-index: 10000;
         }
+
+        #toolbar {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px;
+            background: #fff; border-bottom: 1px solid #e0e0e0;
+        }
+        #editBtn {
+            background: #1890ff; color: #fff; border: none; border-radius: 4px;
+            padding: 6px 16px; cursor: pointer; font-size: 13px; font-weight: 500;
+        }
+        #editBtn.editing {
+            background: #52c41a;
+        }
     </style>
 </head>
 <body>
 
+<div id="toolbar">
+    <button id="editBtn">Edit Liveboard</button>
+</div>
 <div id="embed-container"></div>
 
 <div id="debug-panel">
@@ -68,7 +84,12 @@
         AuthType,
         EmbedEvent,
         Action,
+        HostEvent,
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    // HostEvent may be undefined in some SDK builds — fall back to string values.
+    const HE = HostEvent ?? {};
+    const SET_EDIT_MODE = HE.SetEditMode ?? 'setEditMode';
 
     // ════════════════════════════════════════════════════════════════════════
     //  CONFIGURATION — edit these values
@@ -118,6 +139,26 @@
 
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> via AppEmbed …`);
+
+    // ── Edit button ──────────────────────────────────────────────────────────
+    let isEditing = false;
+    let editDebounceTimer = null;
+
+    function debounceFunc(fn, delay = 300) {
+        clearTimeout(editDebounceTimer);
+        editDebounceTimer = setTimeout(fn, delay);
+    }
+
+    document.getElementById('editBtn').addEventListener('click', () =>
+        debounceFunc(() => {
+            isEditing = !isEditing;
+            embed.trigger(SET_EDIT_MODE, { editMode: isEditing });
+            const btn = document.getElementById('editBtn');
+            btn.textContent = isEditing ? 'Done Editing' : 'Edit Liveboard';
+            btn.classList.toggle('editing', isEditing);
+            dbg(`SetEditMode → <span class="v">${isEditing}</span>`);
+        })
+    );
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function escapeHtml(s) {
