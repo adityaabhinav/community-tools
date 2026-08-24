@@ -87,9 +87,7 @@
         HostEvent,
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
 
-    // HostEvent may be undefined in some SDK builds — fall back to string values.
-    const HE = HostEvent ?? {};
-    const SET_EDIT_MODE = HE.SetEditMode ?? 'setEditMode';
+    const NAVIGATE = HostEvent?.Navigate ?? 'navigate';
 
     // ════════════════════════════════════════════════════════════════════════
     //  CONFIGURATION — edit these values
@@ -152,11 +150,15 @@
     document.getElementById('editBtn').addEventListener('click', () =>
         debounceFunc(() => {
             isEditing = !isEditing;
-            embed.trigger(SET_EDIT_MODE, { editMode: isEditing });
+            // Navigate to the edit-mode or view-mode path of the same liveboard.
+            const path = isEditing
+                ? `pinboard/${LIVEBOARD_ID}?isEditMode=true`
+                : `pinboard/${LIVEBOARD_ID}`;
+            embed.trigger(NAVIGATE, { path });
             const btn = document.getElementById('editBtn');
             btn.textContent = isEditing ? 'Done Editing' : 'Edit Liveboard';
             btn.classList.toggle('editing', isEditing);
-            dbg(`SetEditMode → <span class="v">${isEditing}</span>`);
+            dbg(`Navigate → <span class="v">${path}</span>`);
         })
     );
 
