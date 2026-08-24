@@ -64,7 +64,7 @@
 <script type="module">
     import {
         init,
-        LiveboardEmbed,
+        AppEmbed,
         AuthType,
         EmbedEvent,
     } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
@@ -83,15 +83,15 @@
         authType: AuthType.None,
     });
 
-    const embed = new LiveboardEmbed('#embed-container', {
-        liveboardId: LIVEBOARD_ID,
+    // AppEmbed gives the full ThoughtSpot app experience, which includes
+    // all native edit-mode controls like deleting individual viz tiles.
+    const embed = new AppEmbed('#embed-container', {
+        path: `pinboard/${LIVEBOARD_ID}`,
         fullHeight: true,
-        // No visibleActions/hiddenActions — show all default ThoughtSpot actions
-        // including Edit liveboard and Delete viz tile.
     });
 
-    embed.on(EmbedEvent.LiveboardRendered, () =>
-        dbg('<span class="ok">✔ Liveboard rendered — edit and remove actions are active.</span>')
+    embed.on(EmbedEvent.RouteChange, e =>
+        dbg(`<span class="ok">Route: ${escapeHtml(JSON.stringify(e?.data ?? e))}</span>`)
     );
 
     embed.on(EmbedEvent.Error, e =>
@@ -99,7 +99,7 @@
     );
 
     embed.render();
-    dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
+    dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> via AppEmbed …`);
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function escapeHtml(s) {
