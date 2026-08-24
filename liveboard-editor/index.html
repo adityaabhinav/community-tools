@@ -88,9 +88,9 @@
     const embed = new LiveboardEmbed('#embed-container', {
         liveboardId: LIVEBOARD_ID,
         fullHeight: true,
-        hiddenActions: [
-            'ToggleSize',  // Action.ToggleSize — tile size / resize button
-            'MoveToTab',   // Action.MoveToTab  — move-to-tab button
+        visibleActions: [
+            Action.Edit,    // Edit the viz
+            Action.Remove,  // Delete the viz (trash icon)
         ],
     });
 
@@ -104,7 +104,6 @@
 
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
-    dbg(`HostEvent sample values — Edit: <span class="v">${escapeHtml(String(HostEvent.Edit))}</span> | Remove: <span class="v">${escapeHtml(String(HostEvent.Remove))}</span> | Share: <span class="v">${escapeHtml(String(HostEvent.Share))}</span> | MakeACopy: <span class="v">${escapeHtml(String(HostEvent.MakeACopy))}</span>`);
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function escapeHtml(s) {
