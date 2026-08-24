@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liveboard Editor</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f6f8;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #embed-container { flex: 1; width: 100%; min-height: 0; }
+        #embed-container iframe { width: 100%; height: 100%; border: none; }
+
+        /* ── debug panel ── */
+        #debug-panel {
+            position: fixed; bottom: 0; right: 0; width: 460px;
+            max-height: 300px; overflow-y: auto;
+            background: #1e1e1e; color: #d4d4d4;
+            font-family: monospace; font-size: 11px;
+            border-top-left-radius: 6px;
+            z-index: 9999; display: none;
+        }
+        #debug-panel.visible { display: block; }
+        #debug-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #333; padding: 6px 10px; position: sticky; top: 0;
+            font-size: 11px; font-weight: bold; color: #ccc;
+        }
+        #debug-header button { background: none; border: none; color: #aaa; cursor: pointer; }
+        #debug-log { padding: 6px 10px; }
+        .dbline { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; word-break: break-all; }
+        .t  { color: #569cd6; margin-right: 4px; }
+        .ok { color: #4ec9b0; }
+        .w  { color: #dcdcaa; }
+        .v  { color: #ce9178; }
+        #debug-toggle {
+            position: fixed; bottom: 8px; right: 8px;
+            background: #333; color: #ccc; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 11px; z-index: 10000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="embed-container"></div>
+
+<div id="debug-panel">
+    <div id="debug-header">
+        <span>Debug log — full payloads in browser console</span>
+        <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
+    </div>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="document.getElementById('debug-panel').classList.toggle('visible')">Debug</button>
+
+<script type="module">
+    import {
+        init,
+        LiveboardEmbed,
+        AuthType,
+        EmbedEvent,
+        Action,
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  CONFIGURATION — edit these values
+    // ════════════════════════════════════════════════════════════════════════
+
+    const CLUSTER_URL  = 'https://ps-internal.thoughtspot.cloud';
+    const LIVEBOARD_ID = '18222caa-96a7-46c9-bb42-3e9f02822fe2';
+
+    // ════════════════════════════════════════════════════════════════════════
+
+    init({
+        thoughtSpotHost: CLUSTER_URL,
+        authType: AuthType.None,
+    });
+
+    const embed = new LiveboardEmbed('#embed-container', {
+        liveboardId: LIVEBOARD_ID,
+        fullHeight: true,
+
+        // Expose edit + per-viz remove/delete actions.
+        // All other actions remain at their default visibility.
+        visibleActions: [
+            Action.Edit,             // "Edit liveboard" — opens edit mode
+            Action.Remove,           // "Delete" on each viz tile (removes from liveboard)
+            Action.AddToFavorites,
+            Action.Share,
+            Action.MakeACopy,
+            Action.DownloadAsCsv,
+            Action.DownloadAsPdf,
+            Action.DownloadAsXlsx,
+            Action.Save,
+            Action.Cancel,
+            Action.Present,
+            Action.EditTitle,
+            Action.Explore,
+            Action.Pin,
+            Action.EditDetails,
+            Action.SpotIQAnalyze,
+        ],
+    });
+
+    embed.on(EmbedEvent.LiveboardRendered, () =>
+        dbg('<span class="ok">✔ Liveboard rendered — edit and remove actions are active.</span>')
+    );
+
+    embed.on(EmbedEvent.Error, e =>
+        dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
+    );
+
+    embed.render();
+    dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function dbg(html) {
+        console.log('[liveboard-editor]', html.replace(/<[^>]+>/g, ''));
+        const log  = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.className = 'dbline';
+        line.innerHTML = `<span class="t">[${new Date().toLocaleTimeString()}]</span>${html}`;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+    }
+</script>
+</body>
+</html>
