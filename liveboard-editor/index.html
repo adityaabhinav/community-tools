@@ -116,6 +116,9 @@
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
 
+    // Dump all HostEvent keys so we can find the edit-mode event name.
+    dbg(`HostEvent keys: <span class="v">${escapeHtml(Object.keys(HostEvent).join(', '))}</span>`);
+
     // ── Edit button ──────────────────────────────────────────────────────────
     let isEditing = false;
     let editDebounceTimer = null;
