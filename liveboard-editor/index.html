@@ -116,8 +116,11 @@
     embed.render();
     dbg(`Loading liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
 
-    // Dump all HostEvent keys so we can find the edit-mode event name.
-    dbg(`HostEvent keys: <span class="v">${escapeHtml(Object.keys(HostEvent).join(', '))}</span>`);
+    try {
+        dbg(`HostEvent type: <span class="v">${escapeHtml(typeof HostEvent)}</span> — keys: <span class="v">${escapeHtml(JSON.stringify(Object.keys(HostEvent ?? {})))}</span>`);
+    } catch(e) {
+        dbg(`<span class="w">HostEvent inspect error: ${escapeHtml(String(e))}</span>`);
+    }
 
     // ── Edit button ──────────────────────────────────────────────────────────
     let isEditing = false;
@@ -131,7 +134,9 @@
     document.getElementById('editBtn').addEventListener('click', () =>
         debounceFunc(() => {
             isEditing = !isEditing;
-            embed.trigger(HostEvent.SetEditMode, { editMode: isEditing });
+            // HostEvent is a const enum — values aren't available at runtime.
+            // Use the raw string the SDK uses internally.
+            embed.trigger(HostEvent.SetEditMode ?? 'setEditMode', { editMode: isEditing });
             const btn = document.getElementById('editBtn');
             btn.textContent = isEditing ? 'Done Editing' : 'Edit Liveboard';
             btn.classList.toggle('editing', isEditing);
