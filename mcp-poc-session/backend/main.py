@@ -93,46 +93,50 @@ async def chat_stream(req: ChatRequest):
                 data_source_id=req.data_source_id,
             )
 
-        async for event in event_stream:
-            etype = event.get("type")
+        try:
+            async for event in event_stream:
+                etype = event.get("type")
 
-            if etype in ("thinking", "thinking_text"):
-                yield f"data: {json.dumps(event)}\n\n"
+                if etype in ("thinking", "thinking_text"):
+                    yield f"data: {json.dumps(event)}\n\n"
 
-            elif etype == "token":
-                text = event.get("text", "")
-                full_text.append(text)
-                push_text(text)
-                yield f"data: {json.dumps(event)}\n\n"
+                elif etype == "token":
+                    text = event.get("text", "")
+                    full_text.append(text)
+                    push_text(text)
+                    yield f"data: {json.dumps(event)}\n\n"
 
-            elif etype == "frame_url":
-                iframe_url = event.get("frame_url")
-                # ✅ Store answer_id (durable), not just frame_url (ephemeral)
-                blocks.append({
-                    "kind":         "chart",
-                    "url":          event.get("frame_url"),   # for live render
-                    "answer_id":    event.get("answer_id"),   # for history re-render
-                    "answer_title": event.get("answer_title"),
-                })
-                yield f"data: {json.dumps(event)}\n\n"
+                elif etype == "frame_url":
+                    iframe_url = event.get("frame_url")
+                    blocks.append({
+                        "kind":         "chart",
+                        "url":          event.get("frame_url"),
+                        "answer_id":    event.get("answer_id"),
+                        "answer_title": event.get("answer_title"),
+                    })
+                    yield f"data: {json.dumps(event)}\n\n"
 
-            elif etype == "done":
-                conv_id = event.get("conversation_id")
-                if conv_id:
-                    yield f"data: {json.dumps({'type': 'conversation_id', 'conversation_id': conv_id})}\n\n"
-                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                elif etype == "done":
+                    conv_id = event.get("conversation_id")
+                    if conv_id:
+                        yield f"data: {json.dumps({'type': 'conversation_id', 'conversation_id': conv_id})}\n\n"
+                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
-                save_item({
-                    "id":             uuid.uuid4().hex,
-                    "query":          req.query,
-                    "source":         "thoughtspot",
-                    "text":           "".join(full_text),
-                    "frame_url":      iframe_url,
-                    "conversation_id": conv_id,
-                    "created_at":     datetime.now(timezone.utc).isoformat(),
-                    # ✅ Blocks now carry answer_id for durable history
-                    "content_blocks": json.dumps(blocks),
-                })
+                    save_item({
+                        "id":             uuid.uuid4().hex,
+                        "query":          req.query,
+                        "source":         "thoughtspot",
+                        "text":           "".join(full_text),
+                        "frame_url":      iframe_url,
+                        "conversation_id": conv_id,
+                        "created_at":     datetime.now(timezone.utc).isoformat(),
+                        "content_blocks": json.dumps(blocks),
+                    })
+
+        except Exception as exc:
+            logging.getLogger(__name__).error(f"Stream error [{req.mode}]: {exc}", exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 

@@ -175,6 +175,20 @@ export function useChat(mode: ChatMode = "mcp", modelId?: string) {
               );
             }
 
+            if (event.type === "error") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === botId
+                    ? {
+                        ...m,
+                        blocks: [...(m.blocks ?? []), { kind: "text", text: `⚠️ ${event.message}` }],
+                        text: m.text + `⚠️ ${event.message}`,
+                      }
+                    : m
+                )
+              );
+            }
+
             if (event.type === "done") {
               setMessages((prev) =>
                 prev.map((m) =>

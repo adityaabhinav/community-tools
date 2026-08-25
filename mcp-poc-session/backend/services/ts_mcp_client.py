@@ -33,7 +33,13 @@ def _ts_domain() -> str:
 
 
 def _auth_header() -> dict:
-    return {"Authorization": f"Bearer {get_token()}@{_ts_domain()}"}
+    token = get_token()
+    if not token:
+        raise RuntimeError(
+            "No bearer token available. Set TS_TOKEN in .env or ensure "
+            "TS_USERNAME/TS_PASSWORD are correct so the backend can auto-fetch one."
+        )
+    return {"Authorization": f"Bearer {token}@{_ts_domain()}"}
 
 
 def _rpc(method: str, params: dict, req_id: int = 1) -> dict:
