@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Watchlist Embed — Dynamic Height Test</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f6fa;
+      color: #1a1a2e;
+      padding: 24px;
+    }
+
+    h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 20px; }
+
+    /* ── Config panel ── */
+    .config-panel {
+      background: #fff;
+      border: 1px solid #e2e4ea;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .config-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
+    .config-field label { font-size: 12px; font-weight: 500; color: #555; }
+    .config-field input {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .config-field input:focus { border-color: #2d7af0; box-shadow: 0 0 0 3px rgba(45,122,240,0.12); }
+
+    button {
+      background: #2d7af0;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { background: #1a68d8; }
+    button:disabled { background: #a0b4d6; cursor: not-allowed; }
+
+    /* ── Debug bar ── */
+    .debug-bar {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .debug-bar span { opacity: 0.6; }
+    .debug-bar strong { color: #89b4fa; }
+    .event-badge {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #313244;
+      color: #a6e3a1;
+    }
+    .event-badge.open  { background: #1e3a2f; color: #a6e3a1; }
+    .event-badge.close { background: #2a1e3a; color: #cba6f7; }
+    .event-badge.idle  { background: #313244; color: #6c7086; }
+
+    /* ── Embed wrapper ── */
+    .embed-section { background: #fff; border: 1px solid #e2e4ea; border-radius: 8px; overflow: hidden; }
+    .embed-section-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid #e2e4ea;
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .resize-indicator {
+      margin-left: auto;
+      font-size: 11px;
+      color: #888;
+      font-weight: 400;
+    }
+
+    /*
+     * This is the key container.
+     * Default height is compact; it expands when DialogOpen fires.
+     * The CSS transition makes the resize smooth.
+     */
+    #watchlist-container {
+      width: 100%;
+      height: 320px;          /* ← default compact height */
+      transition: height 0.25s ease;
+      overflow: hidden;
+    }
+
+    /* iframe fills container exactly */
+    #watchlist-container iframe {
+      width: 100% !important;
+      height: 100% !important;
+      border: none;
+    }
+
+    .hint {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #888;
+      line-height: 1.6;
+    }
+    .hint code {
+      background: #f0f1f5;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: "SF Mono", monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Watchlist Embed — Dynamic Height Test</h1>
+  <p class="subtitle">
+    Tests <code>EmbedEvent.DialogOpen / DialogClose</code> to expand the iframe only when
+    "Add to Watchlist" modal is open — no permanent blank space needed.
+  </p>
+
+  <!-- ── Config ── -->
+  <div class="config-panel">
+    <div class="config-field">
+      <label>ThoughtSpot Host</label>
+      <input id="ts-host" type="text"
+        value="https://ps-internal.thoughtspot.cloud"
+        placeholder="https://your-instance.thoughtspot.cloud" />
+    </div>
+    <div class="config-field" style="max-width:120px">
+      <label>Default Height (px)</label>
+      <input id="default-height" type="number" value="320" min="100" />
+    </div>
+    <div class="config-field" style="max-width:120px">
+      <label>Modal Height (px)</label>
+      <input id="modal-height" type="number" value="620" min="200" />
+    </div>
+    <button id="load-btn" onclick="loadEmbed()">Load Embed</button>
+  </div>
+
+  <!-- ── Debug bar ── -->
+  <div class="debug-bar">
+    <span>iframe height: <strong id="dbg-height">—</strong></span>
+    <span>last event: <strong id="dbg-event">—</strong></span>
+    <span>event count: <strong id="dbg-count">0</strong></span>
+    <span id="dbg-badge" class="event-badge idle">idle</span>
+  </div>
+
+  <!-- ── Embed ── -->
+  <div class="embed-section">
+    <div class="embed-section-header">
+      Watchlist
+      <span class="resize-indicator" id="resize-indicator">Click "Load Embed" to start</span>
+    </div>
+    <div id="watchlist-container"></div>
+  </div>
+
+  <p class="hint">
+    <strong>How it works:</strong> Default iframe height is <code id="hint-default">320px</code>.
+    When ThoughtSpot fires <code>EmbedEvent.DialogOpen</code> (modal opens),
+    the container expands to <code id="hint-modal">620px</code>.
+    On <code>EmbedEvent.DialogClose</code> it collapses back.
+    No permanent blank space needed.
+    <br /><br />
+    <strong>Auth note:</strong> This uses <code>AuthType.None</code> — you must already be logged
+    into <code>ps-internal.thoughtspot.cloud</code> in this browser.
+    If you get a login page inside the iframe, log in there once and reload.
+  </p>
+
+  <script type="module">
+    // ─────────────────────────────────────────────
+    // ThoughtSpot Visual Embed SDK (loaded from CDN)
+    // ─────────────────────────────────────────────
+    import {
+      init,
+      AppEmbed,
+      EmbedEvent,
+      AuthType,
+    } from 'https://unpkg.com/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    let embedInstance = null;
+    let eventCount = 0;
+
+    // ── Expose loadEmbed to onclick ──
+    window.loadEmbed = function loadEmbed() {
+      const host          = document.getElementById('ts-host').value.trim().replace(/\/$/, '');
+      const defaultHeight = parseInt(document.getElementById('default-height').value, 10) || 320;
+      const modalHeight   = parseInt(document.getElementById('modal-height').value, 10)   || 620;
+      const container     = document.getElementById('watchlist-container');
+      const btn           = document.getElementById('load-btn');
+
+      if (!host) { alert('Enter a ThoughtSpot host URL first.'); return; }
+
+      // Update hints
+      document.getElementById('hint-default').textContent = `${defaultHeight}px`;
+      document.getElementById('hint-modal').textContent   = `${modalHeight}px`;
+
+      btn.disabled = true;
+      btn.textContent = 'Loading…';
+
+      // Clean up any previous instance
+      if (embedInstance) {
+        try { embedInstance.destroy(); } catch (_) {}
+        container.innerHTML = '';
+      }
+
+      // ── Set container to default height ──
+      container.style.height = `${defaultHeight}px`;
+      updateDebug(defaultHeight, '—', '—', 'idle');
+
+      // ── Init SDK ──
+      init({
+        thoughtSpotHost: host,
+        authType: AuthType.None,   // relies on existing browser session
+        /*
+         * For SSO-based clusters swap to:
+         *   authType: AuthType.EmbeddedSSO,
+         * For secret-key trusted auth:
+         *   authType: AuthType.TrustedAuthTokenCookieless,
+         *   getAuthToken: async () => { return await fetchTokenFromYourBackend(); }
+         */
+      });
+
+      // ── Render Watchlist via AppEmbed ──
+      embedInstance = new AppEmbed('#watchlist-container', {
+        frameParams: { width: '100%', height: '100%' },
+        path: 'watchlist',  // opens #/watchlist route in the TS app
+        /*
+         * Hide TS chrome so only the watchlist panel shows:
+         */
+        showPrimaryNavbar: false,
+        hideOrgSwitcher: true,
+        disableProfileAndHelp: true,
+      });
+
+      // ── KEY: Dynamic height on modal open/close ──
+      embedInstance.on(EmbedEvent.DialogOpen, (payload) => {
+        container.style.height = `${modalHeight}px`;
+        eventCount++;
+        updateDebug(modalHeight, 'DialogOpen', JSON.stringify(payload ?? ''), 'open');
+        document.getElementById('resize-indicator').textContent =
+          `↕ Expanded to ${modalHeight}px (modal open)`;
+      });
+
+      embedInstance.on(EmbedEvent.DialogClose, (payload) => {
+        container.style.height = `${defaultHeight}px`;
+        eventCount++;
+        updateDebug(defaultHeight, 'DialogClose', JSON.stringify(payload ?? ''), 'close');
+        document.getElementById('resize-indicator').textContent =
+          `↕ Collapsed to ${defaultHeight}px (modal closed)`;
+      });
+
+      // ── Optional: also listen for route changes in case modal path changes ──
+      embedInstance.on(EmbedEvent.RouteChange, (payload) => {
+        console.log('[TS] RouteChange', payload);
+      });
+
+      embedInstance.on(EmbedEvent.Error, (err) => {
+        console.error('[TS] Embed error', err);
+        document.getElementById('resize-indicator').textContent = '⚠ Embed error — check console';
+        btn.disabled = false;
+        btn.textContent = 'Reload Embed';
+      });
+
+      embedInstance.render().then(() => {
+        btn.disabled = false;
+        btn.textContent = 'Reload Embed';
+        document.getElementById('resize-indicator').textContent =
+          `Default ${defaultHeight}px — waiting for modal…`;
+      });
+    };
+
+    // ── Debug helpers ──
+    function updateDebug(height, event, _payload, badgeState) {
+      document.getElementById('dbg-height').textContent = `${height}px`;
+      document.getElementById('dbg-event').textContent  = event;
+      document.getElementById('dbg-count').textContent  = eventCount;
+      const badge = document.getElementById('dbg-badge');
+      badge.textContent = badgeState;
+      badge.className   = `event-badge ${badgeState}`;
+    }
+  </script>
+</body>
+</html>
