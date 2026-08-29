@@ -286,13 +286,69 @@
         btn.textContent = 'Reload Embed';
       });
 
-      embedInstance.render().then(() => {
-        btn.disabled = false;
-        btn.textContent = 'Reload Embed';
-        document.getElementById('resize-indicator').textContent =
-          `Default ${defaultHeight}px — waiting for modal…`;
+      embedInstance.on(EmbedEvent.NoCookieAccess, () => {
+        showBlockedMessage(host, 'NoCookieAccess — third-party cookies are blocked. Try the same origin or enable cookies for this site.');
       });
+
+      embedInstance.render()
+        .then(() => {
+          btn.disabled = false;
+          btn.textContent = 'Reload Embed';
+          document.getElementById('resize-indicator').textContent =
+            `Default ${defaultHeight}px — waiting for modal…`;
+          // Hide any previous error
+          const err = document.getElementById('blocked-msg');
+          if (err) err.remove();
+        })
+        .catch((err) => {
+          console.error('[TS] render() rejected', err);
+          showBlockedMessage(host, err?.message ?? String(err));
+          btn.disabled = false;
+          btn.textContent = 'Reload Embed';
+        });
+
+      // Detect iframe "refused to connect" by checking load after timeout
+      setTimeout(() => {
+        const iframe = container.querySelector('iframe');
+        if (!iframe) return;
+        try {
+          // If contentDocument is null and no error event fired, likely CSP blocked
+          if (!iframe.contentDocument && !iframe.contentWindow?.location?.href) {
+            showBlockedMessage(host, 'iframe refused to connect — CSP / X-Frame-Options is blocking the embed. See fix instructions below.');
+          }
+        } catch (_) {
+          // cross-origin access error is expected if it loaded fine
+        }
+      }, 4000);
     };
+
+    // ── Blocked / error message ──
+    function showBlockedMessage(host, reason) {
+      let el = document.getElementById('blocked-msg');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'blocked-msg';
+        el.style.cssText = `
+          background:#fff3cd; border:1px solid #ffc107; border-radius:8px;
+          padding:14px 18px; margin-top:12px; font-size:13px; line-height:1.7;
+        `;
+        document.getElementById('watchlist-container').after(el);
+      }
+      el.innerHTML = `
+        <strong>⚠ Embed blocked — "refused to connect"</strong><br/>
+        <span style="color:#666">${reason}</span><br/><br/>
+        <strong>Fix: whitelist your origin in ThoughtSpot</strong><br/>
+        1. Log into <a href="${host}" target="_blank">${host}</a> as an admin<br/>
+        2. Go to <strong>Admin → Security Settings</strong><br/>
+        3. Under <strong>CORS allowed origins</strong>, add: <code>${location.origin}</code><br/>
+        4. Under <strong>CSP frame-ancestors</strong>, add: <code>${location.origin}</code><br/>
+        5. Save, then click <strong>Reload Embed</strong> above<br/><br/>
+        <em>Opening from <code>file://</code>? Use <code>python3 -m http.server 8080</code>
+        and open <code>http://localhost:8080</code> instead, then whitelist
+        <code>http://localhost:8080</code>.</em>
+      `;
+      document.getElementById('resize-indicator').textContent = '⚠ Blocked — see instructions below';
+    }
 
     // ── Debug helpers ──
     function updateDebug(height, event, _payload, badgeState) {
