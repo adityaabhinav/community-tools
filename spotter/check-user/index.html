@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThoughtSpot — Check User Exists</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f6fa; color: #1a1a2e; padding: 28px; max-width: 760px;
+    }
+    h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 22px; }
+
+    .card {
+      background: #fff; border: 1px solid #e2e4ea; border-radius: 8px;
+      padding: 18px 20px; margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: #888; margin-bottom: 14px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .field:last-child { margin-bottom: 0; }
+    label { font-size: 12px; font-weight: 500; color: #444; }
+    input, textarea {
+      border: 1px solid #d1d5db; border-radius: 6px;
+      padding: 8px 10px; font-size: 13px; outline: none;
+      font-family: inherit; width: 100%;
+    }
+    input[type="password"] { letter-spacing: .12em; }
+    input:focus, textarea:focus {
+      border-color: #2d7af0; box-shadow: 0 0 0 3px rgba(45,122,240,.12);
+    }
+    textarea { resize: vertical; min-height: 72px; }
+
+    .hint { font-size: 11px; color: #999; margin-top: 3px; }
+
+    .row { display: flex; gap: 10px; }
+    .row .field { flex: 1; }
+
+    button {
+      background: #2d7af0; color: #fff; border: none; border-radius: 6px;
+      padding: 9px 20px; font-size: 13px; font-weight: 500; cursor: pointer;
+      width: 100%;
+    }
+    button:hover { background: #1a68d8; }
+    button:disabled { background: #a0b4d6; cursor: not-allowed; }
+
+    /* Results */
+    #results { display: none; }
+    .result-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid #f0f1f5;
+    }
+    .result-row:last-child { border-bottom: none; }
+
+    .badge {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; margin-top: 1px;
+    }
+    .badge.found  { background: #dcfce7; color: #16a34a; }
+    .badge.notfound { background: #fee2e2; color: #dc2626; }
+    .badge.error  { background: #fef9c3; color: #ca8a04; }
+
+    .result-info { flex: 1; }
+    .result-username { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .result-meta { font-size: 12px; color: #555; line-height: 1.8; }
+    .result-meta span { margin-right: 14px; }
+    .result-meta code {
+      background: #f0f1f5; padding: 1px 5px; border-radius: 4px;
+      font-size: 11px; font-family: "SF Mono", monospace;
+    }
+    .tag {
+      display: inline-block; padding: 1px 7px; border-radius: 10px;
+      font-size: 10px; font-weight: 600; vertical-align: middle; margin-left: 6px;
+    }
+    .tag.active   { background: #dcfce7; color: #15803d; }
+    .tag.inactive { background: #fee2e2; color: #b91c1c; }
+
+    .summary {
+      font-size: 12px; color: #666; padding-top: 10px; font-style: italic;
+    }
+
+    .error-msg {
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;
+      padding: 10px 14px; font-size: 12px; color: #7a5800; margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>ThoughtSpot — Check User Exists</h1>
+  <p class="subtitle">Uses secret key (trusted auth) to verify users on a cluster via REST API v2.0</p>
+
+  <div class="card">
+    <div class="card-title">Cluster Config</div>
+    <div class="row">
+      <div class="field">
+        <label>ThoughtSpot Host URL</label>
+        <input id="host" type="text" placeholder="https://your-cluster.thoughtspot.cloud" />
+      </div>
+      <div class="field">
+        <label>Admin Username</label>
+        <input id="admin-user" type="text" placeholder="admin" />
+        <span class="hint">Used to generate the auth token</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Secret Key</label>
+      <input id="secret-key" type="password" placeholder="Paste secret key from Admin → Security Settings" />
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Users to Check</div>
+    <div class="field">
+      <label>Usernames or email addresses</label>
+      <textarea id="usernames" placeholder="One per line:&#10;john.doe@company.com&#10;jane.smith&#10;bob@company.com"></textarea>
+      <span class="hint">Enter one username or email per line</span>
+    </div>
+    <button id="check-btn" onclick="checkUsers()">Check Users</button>
+  </div>
+
+  <!-- Results -->
+  <div class="card" id="results">
+    <div class="card-title">Results</div>
+    <div id="results-body"></div>
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <script>
+    async function checkUsers() {
+      const host       = document.getElementById('host').value.trim().replace(/\/$/, '');
+      const adminUser  = document.getElementById('admin-user').value.trim();
+      const secretKey  = document.getElementById('secret-key').value.trim();
+      const rawUsers   = document.getElementById('usernames').value.trim();
+      const btn        = document.getElementById('check-btn');
+
+      if (!host || !adminUser || !secretKey || !rawUsers) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      const usernames = rawUsers.split('\n').map(u => u.trim()).filter(Boolean);
+      if (usernames.length === 0) { alert('Enter at least one username.'); return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Authenticating…';
+
+      // ── Step 1: Get token ──
+      let token;
+      try {
+        const authResp = await fetch(`${host}/api/rest/2.0/auth/token/full`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: adminUser,
+            secret_key: secretKey,
+            validity_time_in_sec: 300,
+          }),
+        });
+
+        if (!authResp.ok) {
+          const text = await authResp.text();
+          showError(`Auth failed (${authResp.status}): ${text}`);
+          btn.disabled = false;
+          btn.textContent = 'Check Users';
+          return;
+        }
+
+        const authData = await authResp.json();
+        token = authData.token;
+      } catch (err) {
+        showError(`Could not connect to ${host}. Check URL, network, and CORS settings.\n${err.message}`);
+        btn.disabled = false;
+        btn.textContent = 'Check Users';
+        return;
+      }
+
+      // ── Step 2: Check each user ──
+      btn.textContent = `Checking ${usernames.length} user(s)…`;
+
+      const results = [];
+      for (const username of usernames) {
+        const result = await checkUser(host, token, username);
+        results.push({ username, ...result });
+      }
+
+      // ── Step 3: Render ──
+      renderResults(results);
+      btn.disabled = false;
+      btn.textContent = 'Check Again';
+    }
+
+    async function checkUser(host, token, username) {
+      try {
+        const resp = await fetch(`${host}/api/rest/2.0/users/search`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_identifier: username }),
+        });
+
+        if (resp.status === 404) return { found: false };
+
+        if (!resp.ok) {
+          const text = await resp.text();
+          return { found: false, error: `HTTP ${resp.status}: ${text}` };
+        }
+
+        const users = await resp.json();
+        if (!users || users.length === 0) return { found: false };
+
+        // Exact match on username or email
+        let match = users.find(u => u.name === username || u.email === username);
+        if (!match) match = users[0]; // fallback: first result
+
+        return {
+          found:        true,
+          user_id:      match.id,
+          display_name: match.display_name,
+          email:        match.email,
+          status:       match.account_status,
+          account_type: match.account_type,
+        };
+      } catch (err) {
+        return { found: false, error: err.message };
+      }
+    }
+
+    function renderResults(results) {
+      const container = document.getElementById('results');
+      const body      = document.getElementById('results-body');
+      const summary   = document.getElementById('summary');
+
+      body.innerHTML = '';
+      container.style.display = 'block';
+
+      let foundCount = 0;
+
+      for (const r of results) {
+        const row = document.createElement('div');
+        row.className = 'result-row';
+
+        if (r.error) {
+          row.innerHTML = `
+            <div class="badge error">!</div>
+            <div class="result-info">
+              <div class="result-username">${esc(r.username)}</div>
+              <div class="result-meta" style="color:#b45309">Error: ${esc(r.error)}</div>
+            </div>`;
+        } else if (r.found) {
+          foundCount++;
+          const statusTag = r.status === 'ACTIVE'
+            ? `<span class="tag active">ACTIVE</span>`
+            : `<span class="tag inactive">${esc(r.status ?? '?')}</span>`;
+          row.innerHTML = `
+            <div class="badge found">✓</div>
+            <div class="result-info">
+              <div class="result-username">${esc(r.username)} ${statusTag}</div>
+              <div class="result-meta">
+                <span>ID: <code>${esc(r.user_id)}</code></span>
+                <span>Display: ${esc(r.display_name ?? '—')}</span>
+                <span>Email: ${esc(r.email ?? '—')}</span>
+                <span>Type: <code>${esc(r.account_type ?? '—')}</code></span>
+              </div>
+            </div>`;
+        } else {
+          row.innerHTML = `
+            <div class="badge notfound">✗</div>
+            <div class="result-info">
+              <div class="result-username">${esc(r.username)}</div>
+              <div class="result-meta" style="color:#dc2626">User not found on this cluster</div>
+            </div>`;
+        }
+
+        body.appendChild(row);
+      }
+
+      summary.textContent =
+        `${foundCount} of ${results.length} user(s) found on the cluster.`;
+    }
+
+    function showError(msg) {
+      let el = document.getElementById('global-error');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'global-error';
+        el.className = 'error-msg';
+        document.getElementById('check-btn').after(el);
+      }
+      el.textContent = msg;
+    }
+
+    function esc(str) {
+      if (str == null) return '—';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
