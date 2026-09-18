@@ -372,10 +372,10 @@
     }
 
     // Parse ThoughtSpot hyperlink format: {caption}DisplayText{/caption}https://url
-    // Returns the URL portion if present, otherwise returns the original string.
+    // Returns the caption text so the host engine selector is used for the search.
     function parseTsHyperlink(v) {
         if (!v) return null;
-        const m = v.match(/^\{caption\}.*?\{\/caption\}(.+)$/);
+        const m = v.match(/^\{caption\}(.*?)\{\/caption\}/);
         return m ? m[1].trim() : v;
     }
 
