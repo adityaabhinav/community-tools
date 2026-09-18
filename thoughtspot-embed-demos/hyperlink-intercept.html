@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StyleHub — Hyperlink Intercept</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --brand:       #1a1a2e;
+            --brand-light: #16213e;
+            --accent:      #e94560;
+            --text-light:  #f0f0f0;
+            --text-muted:  #a0a8b8;
+            --bg:          #f4f6fb;
+            --card-bg:     #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        nav {
+            height: 60px;
+            background: var(--brand);
+            display: flex; align-items: center;
+            padding: 0 28px; gap: 32px; flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3);
+        }
+        .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+        .logo-icon {
+            width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; font-weight: 900; color: #fff;
+        }
+        .logo-text { font-size: 20px; font-weight: 700; color: var(--text-light); }
+        .logo-text span { color: var(--accent); }
+        .nav-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+        .badge {
+            background: var(--accent); color: #fff;
+            font-size: 11px; font-weight: 700; padding: 3px 8px;
+            border-radius: 20px; letter-spacing: .4px;
+        }
+        .avatar {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 13px; font-weight: 700;
+        }
+
+        /* ── info bar ── */
+        .info-bar {
+            height: 44px;
+            background: var(--brand-light);
+            display: flex; align-items: center;
+            padding: 0 28px; gap: 12px;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+        }
+        .info-icon { font-size: 14px; }
+        .info-text { color: var(--text-muted); font-size: 13px; }
+        .info-text strong { color: #7dd3fc; font-weight: 600; }
+
+        /* ── search engine selector ── */
+        .engine-select {
+            margin-left: auto;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .engine-label { color: var(--text-muted); font-size: 12px; }
+        select#engine {
+            background: rgba(255,255,255,.1); color: var(--text-light);
+            border: 1px solid rgba(255,255,255,.15); border-radius: 6px;
+            padding: 4px 10px; font-size: 12px; cursor: pointer;
+            outline: none;
+        }
+        select#engine option { background: #1e293b; color: #f0f0f0; }
+
+        /* ── content ── */
+        .content {
+            flex: 1; min-height: 0;
+            padding: 16px 24px;
+            display: flex; flex-direction: column;
+        }
+
+        .embed-card {
+            flex: 1; min-height: 0;
+            background: var(--card-bg); border-radius: 12px;
+            box-shadow: 0 1px 6px rgba(0,0,0,.08);
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+        #embed-container { flex: 1; min-height: 0; }
+        #embed-container iframe { width: 100%; height: 100%; border: none; }
+
+        /* ── intercept toast ── */
+        #intercept-toast {
+            position: fixed; top: 76px; right: 24px;
+            background: #0f172a; color: #f8fafc;
+            padding: 14px 18px; border-radius: 12px;
+            font-size: 13px;
+            box-shadow: 0 8px 28px rgba(0,0,0,.25);
+            display: none; flex-direction: column; gap: 6px;
+            z-index: 9998; max-width: 340px;
+            border: 1px solid rgba(255,255,255,.08);
+        }
+        #intercept-toast.show { display: flex; animation: slideIn .2s ease; }
+        .toast-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; }
+        .toast-value { color: #7dd3fc; font-weight: 600; word-break: break-all; }
+        .toast-action { color: #86efac; font-size: 12px; }
+        .toast-close {
+            position: absolute; top: 10px; right: 12px;
+            background: none; border: none; color: #64748b; cursor: pointer; font-size: 16px;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(16px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ── debug ── */
+        #debug-panel {
+            position: fixed; bottom: 0; right: 0; width: 500px;
+            max-height: 280px; overflow-y: auto;
+            background: #1e1e1e; color: #d4d4d4;
+            font-family: monospace; font-size: 11px;
+            border-top-left-radius: 8px; z-index: 9999; display: none;
+        }
+        #debug-panel.visible { display: block; }
+        #debug-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #333; padding: 6px 10px; position: sticky; top: 0;
+            font-size: 11px; font-weight: bold; color: #ccc;
+        }
+        #debug-header button { background: none; border: none; color: #aaa; cursor: pointer; }
+        #debug-log { padding: 6px 10px; }
+        .dbline { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; word-break: break-all; }
+        .t  { color: #569cd6; margin-right: 4px; }
+        .ok { color: #4ec9b0; }
+        .w  { color: #dcdcaa; }
+        .v  { color: #ce9178; }
+        #debug-toggle {
+            position: fixed; bottom: 8px; right: 8px;
+            background: #333; color: #ccc; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 11px; z-index: 10000;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a class="logo" href="#">
+        <div class="logo-icon">S</div>
+        <div class="logo-text">Style<span>Hub</span></div>
+    </a>
+    <div class="nav-right">
+        <span class="badge">LIVE</span>
+        <div class="avatar">AA</div>
+    </div>
+</nav>
+
+<div class="info-bar">
+    <span class="info-icon">🔗</span>
+    <span class="info-text">Answer hyperlinks are <strong>intercepted</strong> — clicking one opens a search instead of navigating inside ThoughtSpot</span>
+    <div class="engine-select">
+        <span class="engine-label">Search with</span>
+        <select id="engine">
+            <option value="safari">Safari (default browser)</option>
+            <option value="google">Google</option>
+            <option value="bing">Bing</option>
+            <option value="duckduckgo">DuckDuckGo</option>
+        </select>
+    </div>
+</div>
+
+<div class="content">
+    <div class="embed-card">
+        <div id="embed-container"></div>
+    </div>
+</div>
+
+<!-- intercept toast -->
+<div id="intercept-toast">
+    <button class="toast-close" onclick="this.parentElement.classList.remove('show')">×</button>
+    <div class="toast-label">Hyperlink intercepted</div>
+    <div class="toast-value" id="toast-value">—</div>
+    <div class="toast-action" id="toast-action">Opening search…</div>
+</div>
+
+<div id="debug-panel">
+    <div id="debug-header">
+        <span>Debug log — hyperlink intercept</span>
+        <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
+    </div>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="document.getElementById('debug-panel').classList.toggle('visible')">Debug</button>
+
+<script type="module">
+    import {
+        init,
+        SearchEmbed,
+        AuthType,
+        EmbedEvent,
+        Action,
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  CONFIGURATION
+    // ════════════════════════════════════════════════════════════════════════
+
+    const CLUSTER_URL = 'https://ps-internal.thoughtspot.cloud';
+    const ANSWER_ID   = '5a2de924-7392-46a4-83b6-5bf62fbff00d';
+
+    // Search URL templates — {q} is replaced with the search term
+    const SEARCH_ENGINES = {
+        safari:     'https://search.apple.com/search?q={q}',  // Apple search (opens in Safari)
+        google:     'https://www.google.com/search?q={q}',
+        bing:       'https://www.bing.com/search?q={q}',
+        duckduckgo: 'https://duckduckgo.com/?q={q}',
+    };
+
+    // ════════════════════════════════════════════════════════════════════════
+
+    init({ thoughtSpotHost: CLUSTER_URL, authType: AuthType.None });
+
+    const embed = new SearchEmbed('#embed-container', {
+        answerId:   ANSWER_ID,
+        fullHeight: true,
+        // Disable ThoughtSpot's default navigation actions
+        // so clicks don't navigate inside the embed before we can intercept
+        disabledActions: [
+            Action.DrillDown,
+            Action.Explore,
+            Action.EditACopy,
+            Action.ViewUnderlyingData,
+        ],
+        disabledActionReason: 'Navigation intercepted by host application',
+    });
+
+    // ── 1. VizPointClick — fires when any cell / data point is clicked ────────
+    embed.on(EmbedEvent.VizPointClick, (payload) => {
+        const data = payload?.data ?? payload;
+        dbg(`VizPointClick: <span class="v">${escapeHtml(JSON.stringify(data))}</span>`);
+
+        const searchTerm = extractSearchTerm(data);
+        if (searchTerm) {
+            openSearch(searchTerm, 'VizPointClick');
+        }
+    });
+
+    // ── 2. DrillDown event — fires when a drill-down / hyperlink is triggered ─
+    embed.on(EmbedEvent.DrillDown, (payload) => {
+        const data = payload?.data ?? payload;
+        dbg(`DrillDown intercepted: <span class="v">${escapeHtml(JSON.stringify(data))}</span>`);
+
+        // Extract the column name + value that was drilled on
+        const points = data?.nonFilteredPoints ?? data?.clickedPoints ?? data?.points ?? [];
+        const point  = points[0] ?? {};
+        const term   = point.value?.formattedValue ?? point.value ?? String(point);
+
+        if (term) openSearch(term, 'DrillDown');
+    });
+
+    // ── 3. postMessage — catches ThoughtSpot-internal navigation events ───────
+    //    (answer-to-answer links, SpotIQ "View Answer" links, etc.)
+    window.addEventListener('message', (event) => {
+        if (!event.origin.startsWith(CLUSTER_URL)) return;
+        const msg = event.data;
+        if (!msg || typeof msg !== 'object') return;
+
+        const type = msg?.type ?? msg?.eventType ?? msg?.name ?? '';
+        console.log('[hyperlink-intercept] postMessage type=' + type, msg);
+
+        // ThoughtSpot fires these types when navigating to an answer
+        const NAV_TYPES = [
+            'NAVIGATE_TO_ANSWER', 'ANSWER_LINK_CLICK', 'HYPERLINK_CLICK',
+            'OPEN_ANSWER', 'ROUTE_CHANGE', 'navigateToAnswer',
+        ];
+
+        if (NAV_TYPES.some(t => type.toLowerCase().includes(t.toLowerCase()))) {
+            dbg(`Navigation event intercepted — type: <span class="v">${escapeHtml(type)}</span>`);
+
+            // Try to get the answer name / link text / URL from the payload
+            const term =
+                msg?.payload?.name ??
+                msg?.payload?.title ??
+                msg?.payload?.url ??
+                msg?.data?.name ??
+                msg?.data?.title ??
+                msg?.name ??
+                type;
+
+            openSearch(term, `postMessage(${type})`);
+        }
+    });
+
+    embed.on(EmbedEvent.Data, () =>
+        dbg('<span class="ok">✔ Answer data loaded. Hyperlink interception is active.</span>')
+    );
+
+    embed.on(EmbedEvent.Error, e =>
+        dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
+    );
+
+    embed.render();
+    dbg(`Loading answer <span class="v">${escapeHtml(ANSWER_ID)}</span> …`);
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Search helpers
+    // ════════════════════════════════════════════════════════════════════════
+
+    function openSearch(term, source) {
+        const engine  = document.getElementById('engine').value;
+        const baseUrl = SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.safari;
+        const url     = baseUrl.replace('{q}', encodeURIComponent(term));
+
+        dbg(`<span class="ok">Opening search [${escapeHtml(engine)}] for "<span class="v">${escapeHtml(term)}</span>" (from ${escapeHtml(source)})</span>`);
+        showInterceptToast(term, engine, url);
+        window.open(url, '_blank');
+    }
+
+    function extractSearchTerm(clickData) {
+        // Walk common VizPointClick payload shapes to find a usable string
+        // Shape 1: { clickedPoint: { selectedAttributes: [{value: {formattedValue}}] } }
+        const attrs = clickData?.clickedPoint?.selectedAttributes ??
+                      clickData?.data?.clickedPoint?.selectedAttributes ?? [];
+        if (attrs.length) {
+            const v = attrs[0]?.value?.formattedValue ?? attrs[0]?.value;
+            if (v) return String(v);
+        }
+
+        // Shape 2: { clickedPoint: { selectedMeasures: [{value}] } }
+        const measures = clickData?.clickedPoint?.selectedMeasures ??
+                         clickData?.data?.clickedPoint?.selectedMeasures ?? [];
+        if (measures.length) {
+            const v = measures[0]?.value?.formattedValue ?? measures[0]?.value;
+            if (v) return String(v);
+        }
+
+        // Shape 3: flat { value, columnName }
+        if (clickData?.value !== undefined) return String(clickData.value);
+
+        return null;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  UI helpers
+    // ════════════════════════════════════════════════════════════════════════
+
+    let toastTimer;
+    function showInterceptToast(term, engine, url) {
+        document.getElementById('toast-value').textContent  = term;
+        document.getElementById('toast-action').textContent = `Opening ${engine} search in new tab…`;
+        const el = document.getElementById('intercept-toast');
+        el.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 5000);
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function dbg(html) {
+        console.log('[hyperlink-intercept]', html.replace(/<[^>]+>/g, ''));
+        const log  = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.className = 'dbline';
+        line.innerHTML = `<span class="t">[${new Date().toLocaleTimeString()}]</span>${html}`;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+    }
+</script>
+</body>
+</html>

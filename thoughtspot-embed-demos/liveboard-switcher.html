@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StyleHub — Liveboard Switcher</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --brand:       #1a1a2e;
+            --brand-light: #16213e;
+            --accent:      #e94560;
+            --accent-hover:#c73652;
+            --text-light:  #f0f0f0;
+            --text-muted:  #a0a8b8;
+            --bg:          #f4f6fb;
+            --card-bg:     #ffffff;
+            --nav-h:       60px;
+            --tab-h:       46px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Top nav ── */
+        nav {
+            height: var(--nav-h);
+            background: var(--brand);
+            display: flex;
+            align-items: center;
+            padding: 0 28px;
+            gap: 32px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3);
+        }
+        .logo {
+            display: flex; align-items: center; gap: 10px; text-decoration: none;
+        }
+        .logo-icon {
+            width: 32px; height: 32px; background: var(--accent);
+            border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; font-size: 18px; font-weight: 900; color: #fff;
+        }
+        .logo-text {
+            font-size: 20px; font-weight: 700; color: var(--text-light); letter-spacing: -0.3px;
+        }
+        .logo-text span { color: var(--accent); }
+        .nav-right {
+            margin-left: auto; display: flex; align-items: center; gap: 16px;
+        }
+        .nav-right .badge {
+            background: var(--accent); color: #fff;
+            font-size: 11px; font-weight: 700; padding: 3px 8px;
+            border-radius: 20px; letter-spacing: .4px;
+        }
+        .avatar {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+        }
+
+        /* ── Tab bar ── */
+        .tab-bar {
+            height: var(--tab-h);
+            background: var(--brand-light);
+            display: flex;
+            align-items: flex-end;
+            padding: 0 20px;
+            gap: 4px;
+            flex-shrink: 0;
+            border-bottom: 2px solid rgba(255,255,255,.06);
+        }
+        .tab {
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 18px 10px;
+            border-radius: 8px 8px 0 0;
+            border: none;
+            cursor: pointer;
+            font-size: 13px; font-weight: 500;
+            transition: background .15s, color .15s;
+            background: transparent;
+            color: var(--text-muted);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            white-space: nowrap;
+        }
+        .tab:hover { background: rgba(255,255,255,.07); color: var(--text-light); }
+        .tab.active {
+            background: var(--bg);
+            color: #1e293b;
+            border-bottom: 2px solid var(--accent);
+            font-weight: 600;
+        }
+        .tab .tab-icon { font-size: 14px; }
+        .tab-bar-right {
+            margin-left: auto; display: flex; align-items: center; gap: 8px; padding-bottom: 8px;
+        }
+        .filter-badge {
+            display: none;
+            background: rgba(233,69,96,.18); color: var(--accent);
+            font-size: 11px; font-weight: 600;
+            padding: 2px 8px; border-radius: 20px;
+            align-items: center; gap: 4px;
+        }
+        .filter-badge.visible { display: flex; }
+        .filter-badge-clear {
+            background: none; border: none; color: var(--accent);
+            cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px;
+        }
+
+        /* ── Loading overlay ── */
+        #loading-overlay {
+            display: none;
+            position: absolute; inset: 0;
+            background: rgba(244,246,251,.8);
+            backdrop-filter: blur(2px);
+            z-index: 100;
+            align-items: center; justify-content: center;
+            flex-direction: column; gap: 14px;
+        }
+        #loading-overlay.show { display: flex; }
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid #e2e8f0;
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+        .loading-text { font-size: 13px; color: #64748b; font-weight: 500; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Content ── */
+        .content {
+            flex: 1; min-height: 0;
+            padding: 16px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* ── Embed card ── */
+        .embed-card {
+            flex: 1; min-height: 0;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 1px 6px rgba(0,0,0,.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .embed-card-header {
+            display: flex; align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid #f0f2f8;
+            flex-shrink: 0; gap: 10px;
+        }
+        #embed-title { font-size: 14px; font-weight: 600; color: #1e293b; }
+        #embed-sub   { font-size: 12px; color: #94a3b8; margin-left: 4px; }
+        .embed-card-actions { margin-left: auto; display: flex; gap: 6px; }
+        .icon-btn {
+            width: 28px; height: 28px; border-radius: 6px; border: none;
+            background: #f1f5f9; color: #64748b; font-size: 14px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background .15s;
+        }
+        .icon-btn:hover { background: #e2e8f0; }
+
+        #embed-container { flex: 1; min-height: 0; }
+        #embed-container iframe { width: 100%; height: 100%; border: none; }
+
+        /* ── Toast ── */
+        #toast {
+            position: fixed; top: 76px; right: 24px;
+            background: #1e293b; color: #f8fafc;
+            padding: 10px 16px; border-radius: 10px;
+            font-size: 13px; font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0,0,0,.2);
+            display: none; align-items: center; gap: 8px;
+            z-index: 9998; max-width: 300px;
+        }
+        #toast.show { display: flex; animation: slideIn .2s ease; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(16px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ── Debug ── */
+        #debug-panel {
+            position: fixed; bottom: 0; right: 0; width: 460px;
+            max-height: 260px; overflow-y: auto;
+            background: #1e1e1e; color: #d4d4d4;
+            font-family: monospace; font-size: 11px;
+            border-top-left-radius: 8px; z-index: 9999; display: none;
+        }
+        #debug-panel.visible { display: block; }
+        #debug-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #333; padding: 6px 10px; position: sticky; top: 0;
+            font-size: 11px; font-weight: bold; color: #ccc;
+        }
+        #debug-header button { background: none; border: none; color: #aaa; cursor: pointer; }
+        #debug-log { padding: 6px 10px; }
+        .dbline { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; word-break: break-all; }
+        .t  { color: #569cd6; margin-right: 4px; }
+        .ok { color: #4ec9b0; }
+        .w  { color: #dcdcaa; }
+        .v  { color: #ce9178; }
+        #debug-toggle {
+            position: fixed; bottom: 8px; right: 8px;
+            background: #333; color: #ccc; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 11px; z-index: 10000;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+    <a class="logo" href="#">
+        <div class="logo-icon">S</div>
+        <div class="logo-text">Style<span>Hub</span></div>
+    </a>
+    <div class="nav-right">
+        <span class="badge">LIVE</span>
+        <div class="avatar">AA</div>
+    </div>
+</nav>
+
+<!-- ── Tab bar ── -->
+<div class="tab-bar" id="tab-bar">
+    <!-- tabs injected by JS -->
+    <div class="tab-bar-right">
+        <div class="filter-badge" id="filter-badge">
+            <span id="filter-badge-text">0 filters carried</span>
+            <button class="filter-badge-clear" id="filter-badge-clear" title="Clear carried filters">×</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Content ── -->
+<div class="content">
+    <div class="embed-card">
+        <div class="embed-card-header">
+            <div>
+                <span id="embed-title">—</span>
+                <span id="embed-sub"></span>
+            </div>
+            <div class="embed-card-actions">
+                <button class="icon-btn" title="Refresh" id="refresh-btn">↺</button>
+            </div>
+        </div>
+        <div id="embed-container"></div>
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loading-text">Loading liveboard…</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"><span id="toast-msg"></span></div>
+
+<!-- ── Debug ── -->
+<div id="debug-panel">
+    <div id="debug-header">
+        <span>Debug log</span>
+        <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
+    </div>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="document.getElementById('debug-panel').classList.toggle('visible')">Debug</button>
+
+<script type="module">
+    import {
+        init,
+        LiveboardEmbed,
+        AuthType,
+        EmbedEvent,
+        HostEvent,
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  CONFIGURATION
+    // ════════════════════════════════════════════════════════════════════════
+
+    const CLUSTER_URL = 'https://ps-internal.thoughtspot.cloud';
+
+    const LIVEBOARDS = [
+        {
+            id:    'e3d32c83-4cf1-472e-88e2-91bec1c5a371',
+            title: 'Retail Overview',
+            icon:  '🏬',
+            sub:   'Top-level sales performance',
+        },
+        {
+            id:    'c401702c-d491-4905-8281-545781c1435b',
+            tabId: 'a593d7b5-f6c5-4161-ba04-df13e297a8bc',
+            title: 'County Detail',
+            icon:  '📍',
+            sub:   'County-level breakdown',
+        },
+    ];
+
+    // ════════════════════════════════════════════════════════════════════════
+
+    let currentEmbed    = null;
+    let activeIdx       = 0;
+    let carriedFilters  = [];   // filters passed from previous liveboard
+    let capturedFilters = [];   // intercepted via postMessage
+
+    // ── init SDK ─────────────────────────────────────────────────────────────
+    init({ thoughtSpotHost: CLUSTER_URL, authType: AuthType.None });
+
+    // ── postMessage filter interceptor ───────────────────────────────────────
+    window.addEventListener('message', (event) => {
+        if (!event.origin.startsWith(CLUSTER_URL)) return;
+        const msg = event.data;
+        if (!msg || typeof msg !== 'object') return;
+
+        const candidates = [
+            msg?.payload?.filters, msg?.payload?.runtimeFilters,
+            msg?.payload?.appliedFilters, msg?.payload?.liveboardFilters,
+            msg?.data?.filters, msg?.data?.runtimeFilters,
+            msg?.data?.appliedFilters, msg?.data?.liveboardFilters,
+            msg?.filters, msg?.runtimeFilters, msg?.appliedFilters,
+        ];
+        for (const list of candidates) {
+            if (!Array.isArray(list) || !list.length) continue;
+            const parsed = parseFilters(list);
+            if (!parsed.length) continue;
+            capturedFilters = parsed;
+            dbg(`postMessage → filters captured: <span class="v">${escapeHtml(JSON.stringify(parsed))}</span>`);
+            break;
+        }
+    });
+
+    // ── Build tabs ────────────────────────────────────────────────────────────
+    const tabBar = document.getElementById('tab-bar');
+    const tabBarRight = document.querySelector('.tab-bar-right');
+
+    LIVEBOARDS.forEach((lb, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'tab' + (i === 0 ? ' active' : '');
+        btn.id = `tab-${i}`;
+        btn.innerHTML = `<span class="tab-icon">${lb.icon}</span>${lb.title}`;
+        btn.addEventListener('click', () => switchTo(i));
+        tabBar.insertBefore(btn, tabBarRight);
+    });
+
+    // ── Initial render ────────────────────────────────────────────────────────
+    renderBoard(0, []);
+
+    // ── Refresh button ────────────────────────────────────────────────────────
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+        renderBoard(activeIdx, carriedFilters);
+    });
+
+    // ── Clear carried filters ─────────────────────────────────────────────────
+    document.getElementById('filter-badge-clear').addEventListener('click', () => {
+        carriedFilters = [];
+        capturedFilters = [];
+        updateFilterBadge([]);
+        renderBoard(activeIdx, []);
+        showToast('Filters cleared');
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Core: switch liveboard
+    // ════════════════════════════════════════════════════════════════════════
+
+    async function switchTo(idx) {
+        if (idx === activeIdx) return;
+
+        showLoading('Capturing filters…');
+
+        // Try to get filters from the currently rendered embed
+        let filtersToCarry = [];
+        if (currentEmbed && HostEvent.GetFilters) {
+            try {
+                const resp = await currentEmbed.trigger(HostEvent.GetFilters);
+                dbg(`GetFilters raw: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
+                filtersToCarry = parseFilters(resp);
+            } catch (e) {
+                dbg(`<span class="w">GetFilters threw: ${escapeHtml(String(e))}</span>`);
+            }
+        }
+        // Fallback: use postMessage-intercepted filters
+        if (!filtersToCarry.length && capturedFilters.length) {
+            filtersToCarry = capturedFilters;
+            dbg(`<span class="ok">Using postMessage-captured filters as fallback</span>`);
+        }
+
+        dbg(`Switching to liveboard ${idx} with ${filtersToCarry.length} filter(s): <span class="v">${escapeHtml(JSON.stringify(filtersToCarry))}</span>`);
+
+        carriedFilters = filtersToCarry;
+        renderBoard(idx, filtersToCarry);
+
+        if (filtersToCarry.length) {
+            showToast(`${filtersToCarry.length} filter${filtersToCarry.length > 1 ? 's' : ''} carried across`);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Render a liveboard
+    // ════════════════════════════════════════════════════════════════════════
+
+    function renderBoard(idx, filters) {
+        activeIdx = idx;
+        const lb  = LIVEBOARDS[idx];
+
+        // Update tabs
+        document.querySelectorAll('.tab').forEach((t, i) =>
+            t.classList.toggle('active', i === idx)
+        );
+
+        // Update embed card header
+        document.getElementById('embed-title').textContent = lb.title;
+        document.getElementById('embed-sub').textContent   = lb.sub;
+
+        // Update filter badge
+        updateFilterBadge(filters);
+
+        // Clear old embed
+        document.getElementById('embed-container').innerHTML = '';
+        showLoading('Loading liveboard…');
+
+        const baseConfig = {
+            liveboardId: lb.id,
+            fullHeight:  true,
+        };
+        if (lb.tabId) baseConfig.activeTabId = lb.tabId;
+
+        // Pre-apply as runtimeFilters so the data is immediately filtered on first render.
+        // After LiveboardRendered we call GetFilters to discover the destination's own
+        // logicalColumnId per column, then promote them to global filter chips via
+        // UpdateFilters(column.id) — avoiding the ambiguous-name GRAPHQL_API_ERRORS.
+        const config = filters.length > 0
+            ? {
+                ...baseConfig,
+                runtimeFilters: filters.map(f => ({
+                    columnName: f.columnName,
+                    operator:   f.operator,
+                    values:     f.values,
+                })),
+              }
+            : baseConfig;
+
+        dbg(`Rendering "${lb.title}" with ${filters.length} runtimeFilter(s) — will promote to global chips after render`);
+
+        currentEmbed = new LiveboardEmbed('#embed-container', config);
+
+        currentEmbed.on(EmbedEvent.LiveboardRendered, async () => {
+            hideLoading();
+            dbg(`<span class="ok">✔ "${lb.title}" rendered</span>`);
+
+            if (!filters.length) return;
+
+            // Two-step promotion: runtimeFilters → global filter chips
+            //
+            // Step 1: call GetFilters on the now-rendered destination.
+            // Because the board rendered with runtimeFilters, those filter instances
+            // are active and GetFilters will return their liveboardFilters entries
+            // including the destination's own logicalColumnId — which is different
+            // from the source board's ID and is what UpdateFilters needs.
+            try {
+                const destResp = await currentEmbed.trigger(HostEvent.GetFilters);
+                dbg(`Dest GetFilters (post-render): <span class="v">${escapeHtml(JSON.stringify(destResp))}</span>`);
+
+                // Build column-name → { logicalColumnId, filterId } map from destination
+                const destSlots = {};
+                for (const group of (destResp?.liveboardFilters ?? [])) {
+                    const cname = group.columnInfo?.name;
+                    if (!cname) continue;
+                    const logicalColumnId = group.columnInfo?.id ?? group.columnInfo?.logicalColumnId;
+                    const filterId = group.filterId ?? group.filters?.[0]?.filterId;
+                    destSlots[cname.toLowerCase()] = { logicalColumnId, filterId, cname };
+                }
+                dbg(`Dest slots resolved: <span class="v">${escapeHtml(JSON.stringify(destSlots))}</span>`);
+
+                if (!Object.keys(destSlots).length) {
+                    dbg(`<span class="w">GetFilters returned no slots — runtimeFilters remain (data still filtered)</span>`);
+                    return;
+                }
+
+                // Step 2: build UpdateFilters payload using destination's own column IDs
+                const filterEntries = filters.flatMap(f => {
+                    const slot = destSlots[f.columnName.toLowerCase()];
+                    if (!slot) {
+                        dbg(`<span class="w">No dest slot for "${escapeHtml(f.columnName)}" — skipping</span>`);
+                        return [];
+                    }
+                    // Prefer column.id (logicalColumnId) — unambiguous even when same
+                    // column name exists in multiple datasources
+                    if (slot.logicalColumnId) {
+                        return [{ column: { id: slot.logicalColumnId }, oper: f.operator, values: f.values }];
+                    }
+                    // Secondary: filterId + filterContent format
+                    if (slot.filterId) {
+                        return [{
+                            filterId:      slot.filterId,
+                            filterContent: [{ filterType: f.operator, negate: false, value: f.values.map(v => ({ key: v })) }],
+                        }];
+                    }
+                    return [];
+                });
+
+                if (!filterEntries.length) {
+                    dbg(`<span class="w">No matching dest slots — runtimeFilters remain</span>`);
+                    return;
+                }
+
+                const payload = { filters: filterEntries, operation: 'replace' };
+                dbg(`Promoting to global chips: <span class="v">${escapeHtml(JSON.stringify(payload))}</span>`);
+                await currentEmbed.trigger(HostEvent.UpdateFilters, payload);
+                dbg(`<span class="ok">✔ Filters promoted to global chips</span>`);
+                showToast(`${filterEntries.length} filter${filterEntries.length > 1 ? 's' : ''} applied as global chips`);
+            } catch (e) {
+                dbg(`<span class="w">Promotion failed: ${escapeHtml(String(e))} — runtimeFilters remain active (data still filtered)</span>`);
+            }
+        });
+
+        currentEmbed.on(EmbedEvent.Error, (e) => {
+            hideLoading();
+            dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`);
+        });
+
+        currentEmbed.render();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Filter helpers
+    // ════════════════════════════════════════════════════════════════════════
+
+    function parseFilters(resp) {
+        if (!resp) return [];
+        if (resp.liveboardFilters) {
+            const result = [];
+            for (const group of resp.liveboardFilters) {
+                const colName = group.columnInfo?.name;
+                if (!colName) continue;
+                const content = group.filters?.[0]?.filterContent?.[0];
+                if (!content) continue;
+                const values = (content.value ?? [])
+                    .map(v => String(v.key ?? v))
+                    .filter(v => v !== '');
+                if (!values.length) continue;
+                result.push({ columnName: colName, operator: content.filterType ?? 'EQ', values });
+            }
+            return result;
+        }
+        const list = Array.isArray(resp) ? resp
+                   : (resp.filters ?? resp.runtimeFilters ?? resp.appliedFilters ?? []);
+        return list.map(f => ({
+            columnName: f.columnName ?? f.column?.name ?? f.name ?? '',
+            operator:   f.operator   ?? f.filterType   ?? 'EQ',
+            values:     Array.isArray(f.values) ? f.values.map(String) :
+                        (f.value != null ? [String(f.value)] : []),
+        })).filter(f => f.columnName && f.values.length);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  UI helpers
+    // ════════════════════════════════════════════════════════════════════════
+
+    function updateFilterBadge(filters) {
+        const badge = document.getElementById('filter-badge');
+        if (filters.length) {
+            document.getElementById('filter-badge-text').textContent =
+                `${filters.length} filter${filters.length > 1 ? 's' : ''} carried`;
+            badge.classList.add('visible');
+        } else {
+            badge.classList.remove('visible');
+        }
+    }
+
+    function showLoading(msg) {
+        document.getElementById('loading-text').textContent = msg ?? 'Loading…';
+        document.getElementById('loading-overlay').classList.add('show');
+    }
+
+    function hideLoading() {
+        document.getElementById('loading-overlay').classList.remove('show');
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+        const el = document.getElementById('toast');
+        document.getElementById('toast-msg').textContent = msg;
+        el.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function dbg(html) {
+        console.log('[liveboard-switcher]', html.replace(/<[^>]+>/g, ''));
+        const log  = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.className = 'dbline';
+        line.innerHTML = `<span class="t">[${new Date().toLocaleTimeString()}]</span>${html}`;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+    }
+</script>
+</body>
+</html>

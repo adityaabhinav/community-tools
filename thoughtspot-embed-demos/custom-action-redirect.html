@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Action – Redirect</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f6f8;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #embed-container { flex: 1; width: 100%; min-height: 0; }
+        #embed-container iframe { width: 100%; height: 100%; border: none; }
+
+        /* ── debug panel ── */
+        #debug-panel {
+            position: fixed; bottom: 0; right: 0; width: 460px;
+            max-height: 300px; overflow-y: auto;
+            background: #1e1e1e; color: #d4d4d4;
+            font-family: monospace; font-size: 11px;
+            border-top-left-radius: 6px;
+            z-index: 9999; display: none;
+        }
+        #debug-panel.visible { display: block; }
+        #debug-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #333; padding: 6px 10px; position: sticky; top: 0;
+            font-size: 11px; font-weight: bold; color: #ccc;
+        }
+        #debug-header button { background: none; border: none; color: #aaa; cursor: pointer; }
+        #debug-log { padding: 6px 10px; }
+        .dbline { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; word-break: break-all; }
+        .t  { color: #569cd6; margin-right: 4px; }
+        .ok { color: #4ec9b0; }
+        .w  { color: #dcdcaa; }
+        .v  { color: #ce9178; }
+        #debug-toggle {
+            position: fixed; bottom: 8px; right: 8px;
+            background: #333; color: #ccc; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 11px; z-index: 10000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="embed-container"></div>
+
+<div id="debug-panel" class="visible">
+    <div id="debug-header">
+        <span>Debug log — full payloads in browser console</span>
+        <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
+    </div>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="document.getElementById('debug-panel').classList.toggle('visible')">Debug</button>
+
+<script type="module">
+    import {
+        init,
+        LiveboardEmbed,
+        AuthType,
+        EmbedEvent,
+        HostEvent,
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  CONFIGURATION — edit these values
+    // ════════════════════════════════════════════════════════════════════════
+
+    const CLUSTER_URL  = 'https://ps-internal.thoughtspot.cloud';
+    const LIVEBOARD_ID = 'e3d32c83-4cf1-472e-88e2-91bec1c5a371';
+
+    // Action ID as configured in ThoughtSpot Admin > Custom Actions
+    const CUSTOM_ACTION_ID = 'redirect';
+
+    // URL to navigate to when the custom action fires.
+    // Opens in a new tab. Change to window.location.href= to replace current page.
+    const REDIRECT_URL = 'https://ps-internal.thoughtspot.cloud/#/insights/pinboard/c401702c-d491-4905-8281-545781c1435b/tab/a593d7b5-f6c5-4161-ba04-df13e297a8bc';
+
+    // ════════════════════════════════════════════════════════════════════════
+
+    // Track the liveboard's applied filters via ThoughtSpot's postMessage traffic.
+    // GetFilters only returns host-set filters; this captures UI-applied ones too.
+    let capturedFilters = [];
+
+    window.addEventListener('message', (event) => {
+        if (!event.origin.startsWith(CLUSTER_URL)) return;
+        const msg = event.data;
+        if (!msg || typeof msg !== 'object') return;
+
+        // Log ALL messages from ThoughtSpot so we can find the filter shape.
+        const type = msg?.type ?? msg?.eventType ?? msg?.name ?? '?';
+        console.log('[custom-action-redirect] postMessage type=' + type, msg);
+
+        // Search all known filter list shapes in the message.
+        const candidates = [
+            msg?.payload?.filters, msg?.payload?.runtimeFilters,
+            msg?.payload?.appliedFilters, msg?.payload?.liveboardFilters,
+            msg?.data?.filters, msg?.data?.runtimeFilters,
+            msg?.data?.appliedFilters, msg?.data?.liveboardFilters,
+            msg?.filters, msg?.runtimeFilters, msg?.appliedFilters,
+        ];
+        for (const list of candidates) {
+            if (!Array.isArray(list) || !list.length) continue;
+            const parsed = parseFilters(list);
+            if (!parsed.length) continue;
+            capturedFilters = parsed;
+            console.log('[custom-action-redirect] postMessage filters captured:', parsed);
+            dbg(`postMessage → filters updated: <span class="v">${escapeHtml(JSON.stringify(parsed))}</span>`);
+            break;
+        }
+    });
+
+    init({
+        thoughtSpotHost: CLUSTER_URL,
+        authType: AuthType.None,
+    });
+
+    const embed = new LiveboardEmbed('#embed-container', {
+        liveboardId: LIVEBOARD_ID,
+        fullHeight: true,
+    });
+
+    embed.on(EmbedEvent.CustomAction, async (payload) => {
+        const raw = payload?.data ?? payload;
+        const id  = raw?.id ?? raw?.actionId ?? '(unknown)';
+
+        dbg(`CustomAction fired — id: <span class="v">${escapeHtml(id)}</span>`);
+        console.log('[custom-action-redirect] Full payload:', JSON.parse(JSON.stringify(raw)));
+        dbg(`Payload keys: <span class="v">${escapeHtml(Object.keys(raw ?? {}).join(', '))}</span>`);
+
+        if (id !== CUSTOM_ACTION_ID) {
+            dbg(`<span class="w">⚠ id "${escapeHtml(id)}" ≠ "${escapeHtml(CUSTOM_ACTION_ID)}" — ignoring</span>`);
+            return;
+        }
+
+        // Capture current liveboard filters and carry them to the destination.
+        let activeFilters = [];
+        if (HostEvent.GetFilters) {
+            try {
+                const resp = await embed.trigger(HostEvent.GetFilters);
+                console.log('[custom-action-redirect] GetFilters raw:', resp);
+                dbg(`GetFilters raw: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
+                activeFilters = parseFilters(resp);
+            } catch (e) {
+                dbg(`<span class="w">GetFilters threw: ${escapeHtml(String(e))}</span>`);
+            }
+        }
+        // Fall back to postMessage-intercepted filters if GetFilters returned nothing.
+        if (!activeFilters.length && capturedFilters.length) {
+            activeFilters = capturedFilters;
+            dbg(`<span class="ok">Using postMessage-captured filters as fallback</span>`);
+        }
+        dbg(`Applying filters to redirect: <span class="v">${escapeHtml(JSON.stringify(activeFilters))}</span>`);
+
+        const url = appendRuntimeFilters(REDIRECT_URL, activeFilters);
+        dbg(`<span class="ok">Opening: ${escapeHtml(url)}</span>`);
+        window.open(url, '_blank');
+    });
+
+    embed.on(EmbedEvent.LiveboardRendered, () =>
+        dbg('<span class="ok">✔ Liveboard rendered — custom action is ready.</span>')
+    );
+
+    embed.on(EmbedEvent.Error, e =>
+        dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
+    );
+
+    embed.render();
+    dbg(`Waiting for liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
+
+    // ── Filter helpers ───────────────────────────────────────────────────────
+    // Normalise GetFilters response into [{columnName, operator, values}].
+    function parseFilters(resp) {
+        if (!resp) return [];
+
+        // Handle GetFilters liveboardFilters shape:
+        // { liveboardFilters: [{ columnInfo: {name}, filters: [{filterContent: [{filterType, value: [{key}]}]}] }] }
+        if (resp.liveboardFilters) {
+            const result = [];
+            for (const group of resp.liveboardFilters) {
+                const colName = group.columnInfo?.name;
+                if (!colName) continue;
+                const content = group.filters?.[0]?.filterContent?.[0];
+                if (!content) continue;
+                const values = (content.value ?? [])
+                    .map(v => String(v.key ?? v))
+                    .filter(v => v !== '');
+                if (!values.length) continue;
+                const operator = content.filterType ?? 'EQ';
+                result.push({ columnName: colName, operator, values });
+            }
+            return result;
+        }
+
+        // Fallback: flat array or legacy shapes
+        const list = Array.isArray(resp) ? resp
+                   : (resp.filters ?? resp.runtimeFilters ?? resp.appliedFilters ?? []);
+        return list.map(f => ({
+            columnName: f.columnName ?? f.column?.name ?? f.name ?? '',
+            operator:   f.operator   ?? f.filterType   ?? 'EQ',
+            values:     Array.isArray(f.values) ? f.values.map(String) :
+                        (f.value != null ? [String(f.value)] : []),
+        })).filter(f => f.columnName && f.values.length);
+    }
+
+    // Append ThoughtSpot runtime filter params to a URL.
+    // Uses col1/op1/val1 … format that ThoughtSpot's SPA router understands.
+    function appendRuntimeFilters(baseUrl, filters) {
+        if (!filters.length) return baseUrl;
+        const params = [];
+        filters.forEach((f, i) => {
+            const n = i + 1;
+            params.push(`col${n}=${encodeURIComponent(f.columnName)}`);
+            params.push(`op${n}=${encodeURIComponent(f.operator)}`);
+            f.values.forEach(v => params.push(`val${n}=${encodeURIComponent(v)}`));
+        });
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        return baseUrl + sep + params.join('&');
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function dbg(html) {
+        console.log('[custom-action-redirect]', html.replace(/<[^>]+>/g, ''));
+        const log  = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.className = 'dbline';
+        line.innerHTML = `<span class="t">[${new Date().toLocaleTimeString()}]</span>${html}`;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+    }
+</script>
+</body>
+</html>

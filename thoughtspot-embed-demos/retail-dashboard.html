@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StyleHub — Analytics</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --brand:       #1a1a2e;
+            --brand-light: #16213e;
+            --accent:      #e94560;
+            --accent-hover:#c73652;
+            --text-light:  #f0f0f0;
+            --text-muted:  #a0a8b8;
+            --bg:          #f4f6fb;
+            --card-bg:     #ffffff;
+            --nav-h:       64px;
+            --bar-h:       48px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── top nav ── */
+        nav {
+            height: var(--nav-h);
+            background: var(--brand);
+            display: flex;
+            align-items: center;
+            padding: 0 28px;
+            gap: 32px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; font-weight: 900; color: #fff;
+        }
+        .logo-text {
+            font-size: 20px; font-weight: 700;
+            color: var(--text-light); letter-spacing: -0.3px;
+        }
+        .logo-text span { color: var(--accent); }
+
+        .nav-links {
+            display: flex; gap: 4px; margin-left: 8px;
+        }
+        .nav-links a {
+            color: var(--text-muted); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            padding: 6px 12px; border-radius: 6px;
+            transition: background .15s, color .15s;
+        }
+        .nav-links a:hover  { background: rgba(255,255,255,.07); color: var(--text-light); }
+        .nav-links a.active { background: rgba(233,69,96,.15);   color: var(--accent); }
+
+        .nav-right {
+            margin-left: auto; display: flex; align-items: center; gap: 16px;
+        }
+        .nav-right .badge {
+            background: var(--accent); color: #fff;
+            font-size: 11px; font-weight: 700; padding: 3px 8px;
+            border-radius: 20px; letter-spacing: .4px;
+        }
+        .avatar {
+            width: 34px; height: 34px; border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+        }
+
+        /* ── sub-bar ── */
+        .sub-bar {
+            height: var(--bar-h);
+            background: var(--brand-light);
+            display: flex; align-items: center;
+            padding: 0 28px; gap: 24px;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+        }
+        .sub-bar-title {
+            color: var(--text-light); font-size: 14px; font-weight: 600;
+        }
+        .sub-bar-sep { color: rgba(255,255,255,.2); }
+        .sub-bar-sub {
+            color: var(--text-muted); font-size: 13px;
+        }
+        .sub-bar-actions { margin-left: auto; display: flex; gap: 8px; }
+        .btn {
+            padding: 6px 14px; border-radius: 6px; border: none;
+            font-size: 13px; font-weight: 500; cursor: pointer;
+            transition: background .15s, opacity .15s;
+        }
+        .btn-ghost {
+            background: rgba(255,255,255,.08); color: var(--text-muted);
+        }
+        .btn-ghost:hover { background: rgba(255,255,255,.14); color: var(--text-light); }
+        .btn-primary {
+            background: var(--accent); color: #fff;
+        }
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        /* ── content area ── */
+        .content {
+            flex: 1; min-height: 0;
+            display: flex; flex-direction: column;
+            padding: 20px 28px 16px;
+            gap: 16px;
+        }
+
+        /* ── stat strip ── */
+        .stat-strip {
+            display: flex; gap: 14px; flex-shrink: 0;
+        }
+        .stat-card {
+            background: var(--card-bg); border-radius: 10px;
+            padding: 14px 20px; flex: 1;
+            box-shadow: 0 1px 4px rgba(0,0,0,.07);
+            border-left: 3px solid transparent;
+        }
+        .stat-card.up   { border-color: #22c55e; }
+        .stat-card.down { border-color: var(--accent); }
+        .stat-card.neu  { border-color: #6366f1; }
+        .stat-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; }
+        .stat-value { font-size: 22px; font-weight: 700; color: #1e293b; margin-top: 2px; }
+        .stat-delta { font-size: 12px; margin-top: 3px; font-weight: 500; }
+        .stat-delta.up   { color: #22c55e; }
+        .stat-delta.down { color: var(--accent); }
+        .stat-delta.neu  { color: #6366f1; }
+
+        /* ── embed card ── */
+        .embed-card {
+            flex: 1; min-height: 0;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 1px 6px rgba(0,0,0,.08);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .embed-card-header {
+            display: flex; align-items: center;
+            padding: 12px 18px;
+            border-bottom: 1px solid #f0f2f8;
+            flex-shrink: 0; gap: 10px;
+        }
+        .embed-card-title {
+            font-size: 14px; font-weight: 600; color: #1e293b;
+        }
+        .embed-card-sub {
+            font-size: 12px; color: #94a3b8; margin-left: 4px;
+        }
+        .embed-card-actions { margin-left: auto; display: flex; gap: 6px; }
+        .icon-btn {
+            width: 28px; height: 28px; border-radius: 6px; border: none;
+            background: #f1f5f9; color: #64748b; font-size: 14px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background .15s;
+        }
+        .icon-btn:hover { background: #e2e8f0; }
+
+        #embed-container { flex: 1; min-height: 0; }
+        #embed-container iframe { width: 100%; height: 100%; border: none; }
+
+        /* ── back button ── */
+        #back-btn {
+            display: none; align-items: center; gap: 6px;
+            background: #f1f5f9; border: none; border-radius: 6px;
+            padding: 5px 12px; font-size: 13px; font-weight: 500;
+            color: #475569; cursor: pointer; transition: background .15s;
+        }
+        #back-btn:hover { background: #e2e8f0; color: #1e293b; }
+        #back-btn .arrow { font-size: 16px; line-height: 1; }
+
+        /* ── drill-down toast ── */
+        #drill-toast {
+            position: fixed; top: 80px; right: 24px;
+            background: #1e293b; color: #f8fafc;
+            padding: 12px 18px; border-radius: 10px;
+            font-size: 13px; font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0,0,0,.2);
+            display: none; align-items: center; gap: 10px;
+            z-index: 9998; max-width: 320px;
+            animation: slideIn .2s ease;
+        }
+        #drill-toast.show { display: flex; }
+        #drill-toast .toast-icon { font-size: 16px; }
+        #drill-toast .toast-close {
+            margin-left: auto; background: none; border: none;
+            color: #94a3b8; cursor: pointer; font-size: 16px; line-height: 1;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ── debug panel ── */
+        #debug-panel {
+            position: fixed; bottom: 0; right: 0; width: 460px;
+            max-height: 280px; overflow-y: auto;
+            background: #1e1e1e; color: #d4d4d4;
+            font-family: monospace; font-size: 11px;
+            border-top-left-radius: 8px; z-index: 9999; display: none;
+        }
+        #debug-panel.visible { display: block; }
+        #debug-header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #333; padding: 6px 10px; position: sticky; top: 0;
+            font-size: 11px; font-weight: bold; color: #ccc;
+        }
+        #debug-header button { background: none; border: none; color: #aaa; cursor: pointer; }
+        #debug-log { padding: 6px 10px; }
+        .dbline { margin-bottom: 4px; border-bottom: 1px solid #2a2a2a; padding-bottom: 4px; word-break: break-all; }
+        .t  { color: #569cd6; margin-right: 4px; }
+        .ok { color: #4ec9b0; }
+        .w  { color: #dcdcaa; }
+        .v  { color: #ce9178; }
+        #debug-toggle {
+            position: fixed; bottom: 8px; right: 8px;
+            background: #333; color: #ccc; border: none; border-radius: 4px;
+            padding: 4px 10px; cursor: pointer; font-size: 11px; z-index: 10000;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Navigation ── -->
+<nav>
+    <a class="logo" href="#">
+        <div class="logo-icon">S</div>
+        <div class="logo-text">Style<span>Hub</span></div>
+    </a>
+    <div class="nav-links">
+        <a href="#">Overview</a>
+        <a href="#" class="active">Analytics</a>
+        <a href="#">Inventory</a>
+        <a href="#">Orders</a>
+        <a href="#">Customers</a>
+    </div>
+    <div class="nav-right">
+        <span class="badge">LIVE</span>
+        <div class="avatar">AA</div>
+    </div>
+</nav>
+
+<!-- ── Sub-bar ── -->
+<div class="sub-bar">
+    <span class="sub-bar-title">Sales Performance</span>
+    <span class="sub-bar-sep">›</span>
+    <span id="breadcrumb-sub" class="sub-bar-sub">Apparel — Alameda County</span>
+    <div class="sub-bar-actions">
+        <button class="btn btn-ghost">Export</button>
+        <button class="btn btn-primary">+ New Report</button>
+    </div>
+</div>
+
+<!-- ── Main content ── -->
+<div class="content">
+
+    <!-- Stat strip -->
+    <div class="stat-strip">
+        <div class="stat-card up">
+            <div class="stat-label">Total Revenue</div>
+            <div class="stat-value">$31.4M</div>
+            <div class="stat-delta up">▲ 8.2% vs last period</div>
+        </div>
+        <div class="stat-card down">
+            <div class="stat-label">Returns Rate</div>
+            <div class="stat-value">4.8%</div>
+            <div class="stat-delta down">▼ 0.3% vs last period</div>
+        </div>
+        <div class="stat-card neu">
+            <div class="stat-label">Top Product Share</div>
+            <div class="stat-value">0.48</div>
+            <div class="stat-delta neu">● Stable</div>
+        </div>
+        <div class="stat-card up">
+            <div class="stat-label">Active SKUs</div>
+            <div class="stat-value">1,240</div>
+            <div class="stat-delta up">▲ 42 new this month</div>
+        </div>
+    </div>
+
+    <!-- Embed card -->
+    <div class="embed-card">
+        <div class="embed-card-header">
+            <button id="back-btn" onclick="goBack()">
+                <span class="arrow">←</span> Back
+            </button>
+            <div>
+                <span id="embed-card-title" class="embed-card-title">Liveboard — Retail Detail</span>
+                <span id="embed-card-sub" class="embed-card-sub">Click a KPI to drill into county-level insights</span>
+            </div>
+            <div class="embed-card-actions">
+                <button class="icon-btn" title="Refresh">↺</button>
+                <button class="icon-btn" title="Fullscreen">⤢</button>
+            </div>
+        </div>
+        <div id="embed-container"></div>
+    </div>
+</div>
+
+<!-- ── Drill-down toast ── -->
+<div id="drill-toast">
+    <span class="toast-icon">🔍</span>
+    <span id="toast-msg">Opening drill-down view…</span>
+    <button class="toast-close" onclick="this.parentElement.classList.remove('show')">×</button>
+</div>
+
+<!-- ── Debug panel ── -->
+<div id="debug-panel">
+    <div id="debug-header">
+        <span>Debug log — full payloads in browser console</span>
+        <button onclick="document.getElementById('debug-panel').classList.remove('visible')">✕</button>
+    </div>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="document.getElementById('debug-panel').classList.toggle('visible')">Debug</button>
+
+<script type="module">
+    import {
+        init,
+        LiveboardEmbed,
+        AuthType,
+        EmbedEvent,
+        HostEvent,
+    } from 'https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.es.js';
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  CONFIGURATION — edit these values
+    // ════════════════════════════════════════════════════════════════════════
+
+    const CLUSTER_URL       = 'https://ps-internal.thoughtspot.cloud';
+    const LIVEBOARD_ID      = 'e3d32c83-4cf1-472e-88e2-91bec1c5a371';
+    const CUSTOM_ACTION_ID  = 'redirect';
+
+    // Destination liveboard (parsed from REDIRECT_URL)
+    const DEST_LIVEBOARD_ID = 'c401702c-d491-4905-8281-545781c1435b';
+    const DEST_TAB_ID       = 'a593d7b5-f6c5-4161-ba04-df13e297a8bc';
+
+    // ════════════════════════════════════════════════════════════════════════
+
+    let capturedFilters = [];
+    let currentEmbed    = null;
+
+    window.addEventListener('message', (event) => {
+        if (!event.origin.startsWith(CLUSTER_URL)) return;
+        const msg = event.data;
+        if (!msg || typeof msg !== 'object') return;
+
+        const type = msg?.type ?? msg?.eventType ?? msg?.name ?? '?';
+        console.log('[retail-dashboard] postMessage type=' + type, msg);
+
+        const candidates = [
+            msg?.payload?.filters, msg?.payload?.runtimeFilters,
+            msg?.payload?.appliedFilters, msg?.payload?.liveboardFilters,
+            msg?.data?.filters, msg?.data?.runtimeFilters,
+            msg?.data?.appliedFilters, msg?.data?.liveboardFilters,
+            msg?.filters, msg?.runtimeFilters, msg?.appliedFilters,
+        ];
+        for (const list of candidates) {
+            if (!Array.isArray(list) || !list.length) continue;
+            const parsed = parseFilters(list);
+            if (!parsed.length) continue;
+            capturedFilters = parsed;
+            dbg(`postMessage → filters updated: <span class="v">${escapeHtml(JSON.stringify(parsed))}</span>`);
+            break;
+        }
+    });
+
+    init({
+        thoughtSpotHost: CLUSTER_URL,
+        authType: AuthType.None,
+    });
+
+    // Expose goBack globally so the HTML button can call it
+    window.goBack = () => renderSourceBoard();
+
+    renderSourceBoard();
+
+    // ── Embed renderers ──────────────────────────────────────────────────────
+
+    function renderSourceBoard() {
+        clearContainer();
+        currentEmbed = new LiveboardEmbed('#embed-container', {
+            liveboardId: LIVEBOARD_ID,
+            fullHeight:  true,
+        });
+        currentEmbed.on(EmbedEvent.CustomAction, handleCustomAction);
+        currentEmbed.on(EmbedEvent.LiveboardRendered, () =>
+            dbg('<span class="ok">✔ Source liveboard rendered — custom action is ready.</span>')
+        );
+        currentEmbed.on(EmbedEvent.Error, e =>
+            dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
+        );
+        currentEmbed.render();
+        setDrillDownMode(false);
+        dbg(`Loading source liveboard <span class="v">${escapeHtml(LIVEBOARD_ID)}</span> …`);
+    }
+
+    function renderDrillBoard(activeFilters) {
+        clearContainer();
+        const runtimeFilters = activeFilters.map(f => ({
+            columnName: f.columnName,
+            operator:   f.operator,
+            values:     f.values,
+        }));
+        currentEmbed = new LiveboardEmbed('#embed-container', {
+            liveboardId:    DEST_LIVEBOARD_ID,
+            activeTabId:    DEST_TAB_ID,
+            runtimeFilters: runtimeFilters,
+            fullHeight:     true,
+        });
+        currentEmbed.on(EmbedEvent.LiveboardRendered, () =>
+            dbg('<span class="ok">✔ Drill-down liveboard rendered.</span>')
+        );
+        currentEmbed.on(EmbedEvent.Error, e =>
+            dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
+        );
+        currentEmbed.render();
+        setDrillDownMode(true);
+        dbg(`Loading drill-down liveboard <span class="v">${escapeHtml(DEST_LIVEBOARD_ID)}</span> with filters: <span class="v">${escapeHtml(JSON.stringify(runtimeFilters))}</span>`);
+    }
+
+    function clearContainer() {
+        document.getElementById('embed-container').innerHTML = '';
+    }
+
+    // ── Custom action handler ────────────────────────────────────────────────
+
+    async function handleCustomAction(payload) {
+        const raw = payload?.data ?? payload;
+        const id  = raw?.id ?? raw?.actionId ?? '(unknown)';
+
+        dbg(`CustomAction fired — id: <span class="v">${escapeHtml(id)}</span>`);
+        console.log('[retail-dashboard] Full payload:', JSON.parse(JSON.stringify(raw)));
+
+        if (id !== CUSTOM_ACTION_ID) {
+            dbg(`<span class="w">⚠ id "${escapeHtml(id)}" ≠ "${escapeHtml(CUSTOM_ACTION_ID)}" — ignoring</span>`);
+            return;
+        }
+
+        showToast('Capturing filters…');
+
+        let activeFilters = [];
+        if (HostEvent.GetFilters) {
+            try {
+                const resp = await currentEmbed.trigger(HostEvent.GetFilters);
+                dbg(`GetFilters raw: <span class="v">${escapeHtml(JSON.stringify(resp))}</span>`);
+                activeFilters = parseFilters(resp);
+            } catch (e) {
+                dbg(`<span class="w">GetFilters threw: ${escapeHtml(String(e))}</span>`);
+            }
+        }
+        if (!activeFilters.length && capturedFilters.length) {
+            activeFilters = capturedFilters;
+            dbg(`<span class="ok">Using postMessage-captured filters as fallback</span>`);
+        }
+
+        dbg(`Drilling down with filters: <span class="v">${escapeHtml(JSON.stringify(activeFilters))}</span>`);
+        showToast('Loading drill-down view…');
+        renderDrillBoard(activeFilters);
+    }
+
+    // ── UI state ─────────────────────────────────────────────────────────────
+
+    function setDrillDownMode(active) {
+        document.getElementById('back-btn').style.display        = active ? 'flex' : 'none';
+        document.getElementById('embed-card-title').textContent  = active ? 'County Detail — Drill Down' : 'Liveboard — Retail Detail';
+        document.getElementById('embed-card-sub').textContent    = active ? 'Filtered view · Click ← to return' : 'Click a KPI to drill into county-level insights';
+        document.getElementById('breadcrumb-sub').textContent    = active ? 'County Detail' : 'Apparel — Alameda County';
+    }
+
+    // ── Filter helpers ───────────────────────────────────────────────────────
+
+    function parseFilters(resp) {
+        if (!resp) return [];
+        if (resp.liveboardFilters) {
+            const result = [];
+            for (const group of resp.liveboardFilters) {
+                const colName = group.columnInfo?.name;
+                if (!colName) continue;
+                const content = group.filters?.[0]?.filterContent?.[0];
+                if (!content) continue;
+                const values = (content.value ?? [])
+                    .map(v => String(v.key ?? v))
+                    .filter(v => v !== '');
+                if (!values.length) continue;
+                result.push({ columnName: colName, operator: content.filterType ?? 'EQ', values });
+            }
+            return result;
+        }
+        const list = Array.isArray(resp) ? resp
+                   : (resp.filters ?? resp.runtimeFilters ?? resp.appliedFilters ?? []);
+        return list.map(f => ({
+            columnName: f.columnName ?? f.column?.name ?? f.name ?? '',
+            operator:   f.operator   ?? f.filterType   ?? 'EQ',
+            values:     Array.isArray(f.values) ? f.values.map(String) :
+                        (f.value != null ? [String(f.value)] : []),
+        })).filter(f => f.columnName && f.values.length);
+    }
+
+    // ── UI helpers ───────────────────────────────────────────────────────────
+
+    function showToast(msg) {
+        const toast = document.getElementById('drill-toast');
+        document.getElementById('toast-msg').textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function dbg(html) {
+        console.log('[retail-dashboard]', html.replace(/<[^>]+>/g, ''));
+        const log  = document.getElementById('debug-log');
+        const line = document.createElement('div');
+        line.className = 'dbline';
+        line.innerHTML = `<span class="t">[${new Date().toLocaleTimeString()}]</span>${html}`;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+    }
+</script>
+</body>
+</html>
