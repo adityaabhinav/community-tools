@@ -173,6 +173,7 @@
         <select id="redirect-mode" onchange="onModeChange()">
             <option value="search">Search caption</option>
             <option value="url">Follow hyperlink URL</option>
+            <option value="county">Search county (Safari)</option>
         </select>
         <div class="engine-divider"></div>
         <div id="engine-row">
@@ -236,22 +237,7 @@
 
     // ════════════════════════════════════════════════════════════════════════
 
-    init({
-        thoughtSpotHost: CLUSTER_URL,
-        authType: AuthType.None,
-        customizations: {
-            style: {
-                customCSS: {
-                    // Prevent ThoughtSpot hyperlink anchors from being followed by the browser.
-                    // pointer-events:none makes clicks fall through to the parent table cell,
-                    // so VizPointClick still fires but the native <a href> navigation doesn't.
-                    rules_UNSTABLE: {
-                        'a[target="_blank"]': { 'pointer-events': 'none' },
-                    },
-                },
-            },
-        },
-    });
+    init({ thoughtSpotHost: CLUSTER_URL, authType: AuthType.None });
 
     const embed = new SearchEmbed('#embed-container', {
         answerId:   ANSWER_ID,
@@ -345,6 +331,22 @@
         dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`)
     );
 
+    // Patch document.createElement so the ThoughtSpot iframe gets a sandbox
+    // without allow-popups. This blocks the native <a target="_blank"> anchor
+    // from opening a tab, while VizPointClick still fires as the sole handler.
+    (function patchIframeSandbox() {
+        const orig = document.createElement.bind(document);
+        document.createElement = function(tag, ...args) {
+            const el = orig(tag, ...args);
+            if (typeof tag === 'string' && tag.toLowerCase() === 'iframe') {
+                el.setAttribute('sandbox',
+                    'allow-same-origin allow-scripts allow-forms allow-modals allow-downloads');
+                document.createElement = orig;
+            }
+            return el;
+        };
+    })();
+
     embed.render();
     dbg(`Loading answer <span class="v">${escapeHtml(ANSWER_ID)}</span> …`);
 
@@ -354,7 +356,7 @@
 
     function onModeChange() {
         const mode = document.getElementById('redirect-mode').value;
-        document.getElementById('engine-row').classList.toggle('hidden', mode === 'url');
+        document.getElementById('engine-row').classList.toggle('hidden', mode === 'url' || mode === 'county');
     }
 
     function openSearch(term, source) {
@@ -369,7 +371,8 @@
             return;
         }
 
-        const engine  = document.getElementById('engine').value;
+        // "Search county" mode always uses Safari, ignoring the engine dropdown
+        const engine  = mode === 'county' ? 'safari' : document.getElementById('engine').value;
         const baseUrl = SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.safari;
         const url     = baseUrl.replace('{q}', encodeURIComponent(term));
 
@@ -388,6 +391,15 @@
             ...(cp?.selectedAttributes   ?? []),
             ...(cp?.deselectedAttributes ?? []),
         ];
+
+        // County mode: return the first plain-text (non-hyperlink) attribute — that's the County name
+        if (mode === 'county') {
+            for (const attr of allAttrs) {
+                const raw = attr?.value?.formattedValue ?? attr?.value;
+                if (raw == null) continue;
+                if (!parseTsHyperlink(String(raw))) return String(raw);
+            }
+        }
 
         // First pass: look only for {caption}…{/caption} hyperlink values
         for (const attr of allAttrs) {
