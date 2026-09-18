@@ -349,11 +349,19 @@
             ...(cp?.selectedAttributes   ?? []),
             ...(cp?.deselectedAttributes ?? []),
         ];
+
+        // First pass: look only for {caption}…{/caption} hyperlink values
         for (const attr of allAttrs) {
             const raw = attr?.value?.formattedValue ?? attr?.value;
             if (raw == null) continue;
             const v = parseTsHyperlink(String(raw));
-            if (v) return v;
+            if (v != null) return v;
+        }
+
+        // Second pass: fall back to first plain string value
+        for (const attr of allAttrs) {
+            const raw = attr?.value?.formattedValue ?? attr?.value;
+            if (raw != null) return String(raw);
         }
 
         const allMeasures = [
@@ -372,11 +380,12 @@
     }
 
     // Parse ThoughtSpot hyperlink format: {caption}DisplayText{/caption}https://url
-    // Returns the caption text so the host engine selector is used for the search.
+    // Returns only the caption text; returns null for non-hyperlink strings so the
+    // caller can skip to the next attribute before falling back to plain values.
     function parseTsHyperlink(v) {
         if (!v) return null;
         const m = v.match(/^\{caption\}(.*?)\{\/caption\}/);
-        return m ? m[1].trim() : v;
+        return m ? m[1].trim() : null;
     }
 
     // ════════════════════════════════════════════════════════════════════════
