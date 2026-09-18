@@ -236,7 +236,22 @@
 
     // ════════════════════════════════════════════════════════════════════════
 
-    init({ thoughtSpotHost: CLUSTER_URL, authType: AuthType.None });
+    init({
+        thoughtSpotHost: CLUSTER_URL,
+        authType: AuthType.None,
+        customizations: {
+            style: {
+                customCSS: {
+                    // Prevent ThoughtSpot hyperlink anchors from being followed by the browser.
+                    // pointer-events:none makes clicks fall through to the parent table cell,
+                    // so VizPointClick still fires but the native <a href> navigation doesn't.
+                    rules_UNSTABLE: {
+                        'a[target="_blank"]': { 'pointer-events': 'none' },
+                    },
+                },
+            },
+        },
+    });
 
     const embed = new SearchEmbed('#embed-container', {
         answerId:   ANSWER_ID,
