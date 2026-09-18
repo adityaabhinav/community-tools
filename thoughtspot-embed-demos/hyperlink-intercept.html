@@ -173,7 +173,7 @@
         <select id="redirect-mode" onchange="onModeChange()">
             <option value="search">Search caption</option>
             <option value="url">Follow hyperlink URL</option>
-            <option value="county">Search county (Safari)</option>
+            <option value="county">Search county (Facebook)</option>
         </select>
         <div class="engine-divider"></div>
         <div id="engine-row">
@@ -229,7 +229,8 @@
 
     // Search URL templates — {q} is replaced with the search term
     const SEARCH_ENGINES = {
-        safari:     'https://search.apple.com/search?q={q}',  // Apple search (opens in Safari)
+        facebook:   'https://www.facebook.com/search/top?q={q}',
+        safari:     'https://search.apple.com/search?q={q}',
         google:     'https://www.google.com/search?q={q}',
         bing:       'https://www.bing.com/search?q={q}',
         duckduckgo: 'https://duckduckgo.com/?q={q}',
@@ -371,8 +372,8 @@
             return;
         }
 
-        // "Search county" mode always uses Safari, ignoring the engine dropdown
-        const engine  = mode === 'county' ? 'safari' : document.getElementById('engine').value;
+        // "Search county" mode always uses Facebook, ignoring the engine dropdown
+        const engine  = mode === 'county' ? 'facebook' : document.getElementById('engine').value;
         const baseUrl = SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.safari;
         const url     = baseUrl.replace('{q}', encodeURIComponent(term));
 
