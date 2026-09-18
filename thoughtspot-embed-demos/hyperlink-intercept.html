@@ -255,6 +255,16 @@
     // ── 2. DrillDown event — fires when a drill-down / hyperlink is triggered ─
     embed.on(EmbedEvent.DrillDown, (payload) => {
         const data = payload?.data ?? payload;
+
+        // Ignore Pendo analytics / location events — they fire DrillDown with no points
+        const hasPoints = Array.isArray(data?.nonFilteredPoints) ||
+                          Array.isArray(data?.clickedPoints) ||
+                          Array.isArray(data?.points);
+        if (!hasPoints) {
+            dbg(`<span class="w">DrillDown: ignoring non-drilldown payload (${escapeHtml(JSON.stringify(data)).slice(0, 120)})</span>`);
+            return;
+        }
+
         dbg(`DrillDown intercepted: <span class="v">${escapeHtml(JSON.stringify(data))}</span>`);
 
         // Extract the column name + value that was drilled on
@@ -314,6 +324,14 @@
     // ════════════════════════════════════════════════════════════════════════
 
     function openSearch(term, source) {
+        // If the intercepted value is already a URL, open it directly
+        if (/^https?:\/\//i.test(term)) {
+            dbg(`<span class="ok">Opening URL directly: <span class="v">${escapeHtml(term)}</span> (from ${escapeHtml(source)})</span>`);
+            showInterceptToast(term, 'direct link', term);
+            window.open(term, '_blank');
+            return;
+        }
+
         const engine  = document.getElementById('engine').value;
         const baseUrl = SEARCH_ENGINES[engine] ?? SEARCH_ENGINES.safari;
         const url     = baseUrl.replace('{q}', encodeURIComponent(term));
@@ -324,27 +342,41 @@
     }
 
     function extractSearchTerm(clickData) {
-        // Walk common VizPointClick payload shapes to find a usable string
-        // Shape 1: { clickedPoint: { selectedAttributes: [{value: {formattedValue}}] } }
-        const attrs = clickData?.clickedPoint?.selectedAttributes ??
-                      clickData?.data?.clickedPoint?.selectedAttributes ?? [];
-        if (attrs.length) {
-            const v = attrs[0]?.value?.formattedValue ?? attrs[0]?.value;
+        // Walk common VizPointClick payload shapes to find a usable string.
+        // Hyperlink cells land in deselectedAttributes, so check both buckets.
+        const cp = clickData?.clickedPoint ?? clickData?.data?.clickedPoint;
+        const allAttrs = [
+            ...(cp?.selectedAttributes   ?? []),
+            ...(cp?.deselectedAttributes ?? []),
+        ];
+        for (const attr of allAttrs) {
+            const raw = attr?.value?.formattedValue ?? attr?.value;
+            if (raw == null) continue;
+            const v = parseTsHyperlink(String(raw));
+            if (v) return v;
+        }
+
+        const allMeasures = [
+            ...(cp?.selectedMeasures   ?? []),
+            ...(cp?.deselectedMeasures ?? []),
+        ];
+        if (allMeasures.length) {
+            const v = allMeasures[0]?.value?.formattedValue ?? allMeasures[0]?.value;
             if (v) return String(v);
         }
 
-        // Shape 2: { clickedPoint: { selectedMeasures: [{value}] } }
-        const measures = clickData?.clickedPoint?.selectedMeasures ??
-                         clickData?.data?.clickedPoint?.selectedMeasures ?? [];
-        if (measures.length) {
-            const v = measures[0]?.value?.formattedValue ?? measures[0]?.value;
-            if (v) return String(v);
-        }
-
-        // Shape 3: flat { value, columnName }
+        // flat { value, columnName }
         if (clickData?.value !== undefined) return String(clickData.value);
 
         return null;
+    }
+
+    // Parse ThoughtSpot hyperlink format: {caption}DisplayText{/caption}https://url
+    // Returns the URL portion if present, otherwise returns the original string.
+    function parseTsHyperlink(v) {
+        if (!v) return null;
+        const m = v.match(/^\{caption\}.*?\{\/caption\}(.+)$/);
+        return m ? m[1].trim() : v;
     }
 
     // ════════════════════════════════════════════════════════════════════════
