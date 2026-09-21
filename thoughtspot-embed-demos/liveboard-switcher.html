@@ -439,10 +439,8 @@
         };
         if (lb.tabId) baseConfig.activeTabId = lb.tabId;
 
-        // Pre-apply as runtimeFilters so the data is immediately filtered on first render.
-        // After LiveboardRendered we call GetFilters to discover the destination's own
-        // logicalColumnId per column, then promote them to global filter chips via
-        // UpdateFilters(column.id) — avoiding the ambiguous-name GRAPHQL_API_ERRORS.
+        // Pass as runtimeFilters so data is immediately filtered on first render.
+        // After LiveboardRendered, UpdateFilters promotes them to global filter chips.
         const config = filters.length > 0
             ? {
                 ...baseConfig,
@@ -454,7 +452,7 @@
               }
             : baseConfig;
 
-        dbg(`Rendering "${lb.title}" with ${filters.length} runtimeFilter(s) — will promote to global chips after render`);
+        dbg(`Rendering "${lb.title}" with ${filters.length} runtimeFilter(s)`);
 
         currentEmbed = new LiveboardEmbed('#embed-container', config);
 
@@ -464,67 +462,23 @@
 
             if (!filters.length) return;
 
-            // Two-step promotion: runtimeFilters → global filter chips
-            //
-            // Step 1: call GetFilters on the now-rendered destination.
-            // Because the board rendered with runtimeFilters, those filter instances
-            // are active and GetFilters will return their liveboardFilters entries
-            // including the destination's own logicalColumnId — which is different
-            // from the source board's ID and is what UpdateFilters needs.
+            // Promote runtimeFilters to global filter chips via UpdateFilters.
+            // Using column name is sufficient and avoids the brittle two-step
+            // GetFilters(dest) → logicalColumnId lookup that was breaking silently.
             try {
-                const destResp = await currentEmbed.trigger(HostEvent.GetFilters);
-                dbg(`Dest GetFilters (post-render): <span class="v">${escapeHtml(JSON.stringify(destResp))}</span>`);
-
-                // Build column-name → { logicalColumnId, filterId } map from destination
-                const destSlots = {};
-                for (const group of (destResp?.liveboardFilters ?? [])) {
-                    const cname = group.columnInfo?.name;
-                    if (!cname) continue;
-                    const logicalColumnId = group.columnInfo?.id ?? group.columnInfo?.logicalColumnId;
-                    const filterId = group.filterId ?? group.filters?.[0]?.filterId;
-                    destSlots[cname.toLowerCase()] = { logicalColumnId, filterId, cname };
-                }
-                dbg(`Dest slots resolved: <span class="v">${escapeHtml(JSON.stringify(destSlots))}</span>`);
-
-                if (!Object.keys(destSlots).length) {
-                    dbg(`<span class="w">GetFilters returned no slots — runtimeFilters remain (data still filtered)</span>`);
-                    return;
-                }
-
-                // Step 2: build UpdateFilters payload using destination's own column IDs
-                const filterEntries = filters.flatMap(f => {
-                    const slot = destSlots[f.columnName.toLowerCase()];
-                    if (!slot) {
-                        dbg(`<span class="w">No dest slot for "${escapeHtml(f.columnName)}" — skipping</span>`);
-                        return [];
-                    }
-                    // Prefer column.id (logicalColumnId) — unambiguous even when same
-                    // column name exists in multiple datasources
-                    if (slot.logicalColumnId) {
-                        return [{ column: { id: slot.logicalColumnId }, oper: f.operator, values: f.values }];
-                    }
-                    // Secondary: filterId + filterContent format
-                    if (slot.filterId) {
-                        return [{
-                            filterId:      slot.filterId,
-                            filterContent: [{ filterType: f.operator, negate: false, value: f.values.map(v => ({ key: v })) }],
-                        }];
-                    }
-                    return [];
-                });
-
-                if (!filterEntries.length) {
-                    dbg(`<span class="w">No matching dest slots — runtimeFilters remain</span>`);
-                    return;
-                }
-
-                const payload = { filters: filterEntries, operation: 'replace' };
+                const payload = {
+                    filters: filters.map(f => ({
+                        column:   { name: f.columnName },
+                        operator: f.operator,
+                        values:   f.values,
+                    })),
+                };
                 dbg(`Promoting to global chips: <span class="v">${escapeHtml(JSON.stringify(payload))}</span>`);
                 await currentEmbed.trigger(HostEvent.UpdateFilters, payload);
                 dbg(`<span class="ok">✔ Filters promoted to global chips</span>`);
-                showToast(`${filterEntries.length} filter${filterEntries.length > 1 ? 's' : ''} applied as global chips`);
+                showToast(`${filters.length} filter${filters.length > 1 ? 's' : ''} applied`);
             } catch (e) {
-                dbg(`<span class="w">Promotion failed: ${escapeHtml(String(e))} — runtimeFilters remain active (data still filtered)</span>`);
+                dbg(`<span class="w">UpdateFilters failed: ${escapeHtml(String(e))} — runtimeFilters still active (data is filtered)</span>`);
             }
         });
 
@@ -542,9 +496,14 @@
 
     function parseFilters(resp) {
         if (!resp) return [];
-        if (resp.liveboardFilters) {
+        // Unwrap common SDK response envelopes before inspecting
+        const root = (resp?.liveboardFilters || resp?.filters || resp?.runtimeFilters || resp?.appliedFilters)
+            ? resp
+            : (resp?.data ?? resp?.payload ?? resp);
+
+        if (root?.liveboardFilters) {
             const result = [];
-            for (const group of resp.liveboardFilters) {
+            for (const group of root.liveboardFilters) {
                 const colName = group.columnInfo?.name;
                 if (!colName) continue;
                 const content = group.filters?.[0]?.filterContent?.[0];
@@ -557,8 +516,8 @@
             }
             return result;
         }
-        const list = Array.isArray(resp) ? resp
-                   : (resp.filters ?? resp.runtimeFilters ?? resp.appliedFilters ?? []);
+        const list = Array.isArray(root) ? root
+                   : (root?.filters ?? root?.runtimeFilters ?? root?.appliedFilters ?? []);
         return list.map(f => ({
             columnName: f.columnName ?? f.column?.name ?? f.name ?? '',
             operator:   f.operator   ?? f.filterType   ?? 'EQ',
