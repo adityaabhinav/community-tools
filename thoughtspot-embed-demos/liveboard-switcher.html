@@ -468,9 +468,9 @@
             try {
                 const payload = {
                     filters: filters.map(f => ({
-                        column: { name: f.columnName },
-                        oper:   f.operator,
-                        values: f.values,
+                        column:   { name: f.columnName },
+                        operator: f.operator,
+                        values:   f.values,
                     })),
                 };
                 dbg(`Promoting to global chips: <span class="v">${escapeHtml(JSON.stringify(payload))}</span>`);
