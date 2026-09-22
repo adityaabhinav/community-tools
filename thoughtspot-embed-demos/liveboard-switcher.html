@@ -462,49 +462,22 @@
 
             if (!filters.length) return;
 
-            // Two-step promotion: runtimeFilters → global filter chips.
-            //
-            // UpdateFilters requires destination logicalColumnIds (not column names).
-            // Step 1: GetFilters on the now-rendered destination to get those IDs.
-            //         logicalColumnId lives at group.groupId.logicalColumnId —
-            //         NOT group.columnInfo.id (which is null in the response).
-            // Step 2: UpdateFilters with { column: { id }, oper, values }.
+            // Promote runtimeFilters to global filter chips.
+            // UpdateFilters takes column as a plain string name (not an object).
             try {
-                const destResp = await currentEmbed.trigger(HostEvent.GetFilters);
-                dbg(`Dest GetFilters: <span class="v">${escapeHtml(JSON.stringify(destResp))}</span>`);
-
-                const destRoot = destResp?.liveboardFilters ? destResp
-                               : (destResp?.data ?? destResp?.payload ?? destResp);
-
-                const destSlots = {};
-                for (const group of (destRoot?.liveboardFilters ?? [])) {
-                    const cname = group.columnInfo?.name;
-                    const lcid  = group.groupId?.logicalColumnId;
-                    if (cname && lcid) destSlots[cname.toLowerCase()] = lcid;
-                }
-                dbg(`Dest slots: <span class="v">${escapeHtml(JSON.stringify(destSlots))}</span>`);
-
-                const filterEntries = filters.flatMap(f => {
-                    const lcid = destSlots[f.columnName.toLowerCase()];
-                    if (!lcid) {
-                        dbg(`<span class="w">No dest slot for "${escapeHtml(f.columnName)}" — skipping</span>`);
-                        return [];
-                    }
-                    return [{ column: { id: lcid }, oper: f.operator, values: f.values }];
-                });
-
-                if (!filterEntries.length) {
-                    dbg(`<span class="w">No matching dest slots — runtimeFilters remain active</span>`);
-                    return;
-                }
-
-                const payload = { filters: filterEntries };
+                const payload = {
+                    filters: filters.map(f => ({
+                        column: f.columnName,
+                        oper:   f.operator,
+                        values: f.values,
+                    })),
+                };
                 dbg(`Promoting to global chips: <span class="v">${escapeHtml(JSON.stringify(payload))}</span>`);
                 await currentEmbed.trigger(HostEvent.UpdateFilters, payload);
                 dbg(`<span class="ok">✔ Filters promoted to global chips</span>`);
-                showToast(`${filterEntries.length} filter${filterEntries.length > 1 ? 's' : ''} applied`);
+                showToast(`${filters.length} filter${filters.length > 1 ? 's' : ''} applied`);
             } catch (e) {
-                dbg(`<span class="w">Promotion failed: ${escapeHtml(String(e))} — runtimeFilters still active (data is filtered)</span>`);
+                dbg(`<span class="w">UpdateFilters failed: ${escapeHtml(String(e))} — runtimeFilters still active (data is filtered)</span>`);
             }
         });
 
