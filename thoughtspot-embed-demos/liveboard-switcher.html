@@ -451,6 +451,10 @@
 
             if (!filters.length) return;
 
+            // Brief settle delay — UpdateFilters ("No answer found") if called
+            // immediately after LiveboardRendered even though GetFilters succeeds.
+            await new Promise(r => setTimeout(r, 300));
+
             // Promote runtimeFilters to global filter chips.
             // Step 1: GetFilters on the destination to discover which chips exist
             //         and their exact casing — column names differ across liveboards.
