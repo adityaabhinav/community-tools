@@ -439,20 +439,9 @@
         };
         if (lb.tabId) baseConfig.activeTabId = lb.tabId;
 
-        // Pass as runtimeFilters so data is immediately filtered on first render.
-        // After LiveboardRendered, UpdateFilters promotes them to global filter chips.
-        const config = filters.length > 0
-            ? {
-                ...baseConfig,
-                runtimeFilters: filters.map(f => ({
-                    columnName: f.columnName,
-                    operator:   f.operator,
-                    values:     f.values,
-                })),
-              }
-            : baseConfig;
+        const config = { ...baseConfig };
 
-        dbg(`Rendering "${lb.title}" with ${filters.length} runtimeFilter(s)`);
+        dbg(`Rendering "${lb.title}" — filters will be applied via UpdateFilters after render`);
 
         currentEmbed = new LiveboardEmbed('#embed-container', config);
 
