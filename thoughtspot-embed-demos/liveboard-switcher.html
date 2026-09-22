@@ -462,29 +462,46 @@
 
             if (!filters.length) return;
 
-            // Attempt to promote runtimeFilters to global filter chips.
-            // This only works if the destination liveboard has those columns
-            // configured as filter chips in ThoughtSpot — otherwise the SDK
-            // returns NON_EXIST_FILTER. Either way, runtimeFilters already
-            // ensure the data is filtered correctly.
+            // Promote runtimeFilters to global filter chips.
+            // Step 1: GetFilters on the destination to discover which chips exist
+            //         and their exact casing — column names differ across liveboards.
+            // Step 2: case-insensitively match source column names to destination
+            //         chip names, then call UpdateFilters with the destination's
+            //         exact names (UpdateFilters is case-sensitive).
             try {
-                const payload = {
-                    filters: filters.map(f => ({
-                        column: f.columnName,
-                        oper:   f.operator,
-                        values: f.values,
-                    })),
-                };
+                const destResp = await currentEmbed.trigger(HostEvent.GetFilters);
+                const destRoot = destResp?.liveboardFilters ? destResp
+                               : (destResp?.data ?? destResp?.payload ?? destResp);
+
+                // lowercase → exact chip name on the destination
+                const destChips = {};
+                for (const group of (destRoot?.liveboardFilters ?? [])) {
+                    const name = group.columnInfo?.name;
+                    if (name) destChips[name.toLowerCase()] = name;
+                }
+                dbg(`Dest chips: <span class="v">${escapeHtml(JSON.stringify(destChips))}</span>`);
+
+                const filterEntries = filters.flatMap(f => {
+                    const destName = destChips[f.columnName.toLowerCase()];
+                    if (!destName) {
+                        dbg(`<span class="w">No chip for "${escapeHtml(f.columnName)}" on this liveboard — skipping (add it as a filter chip in ThoughtSpot to enable sync)</span>`);
+                        return [];
+                    }
+                    return [{ column: destName, oper: f.operator, values: f.values }];
+                });
+
+                if (!filterEntries.length) {
+                    dbg(`<span class="w">No matching filter chips — runtimeFilters remain active (data is filtered)</span>`);
+                    return;
+                }
+
+                const payload = { filters: filterEntries };
                 dbg(`Promoting to global chips: <span class="v">${escapeHtml(JSON.stringify(payload))}</span>`);
                 await currentEmbed.trigger(HostEvent.UpdateFilters, payload);
                 dbg(`<span class="ok">✔ Filters applied as global chips</span>`);
-                showToast(`${filters.length} filter${filters.length > 1 ? 's' : ''} applied`);
+                showToast(`${filterEntries.length} filter${filterEntries.length > 1 ? 's' : ''} applied`);
             } catch (e) {
-                // UpdateFilters fails when the destination liveboard doesn't have
-                // those columns configured as filter chips in ThoughtSpot.
-                // The NON_EXIST_FILTER SDK errors arrive via EmbedEvent.Error (suppressed below).
-                const cols = filters.map(f => `"${escapeHtml(f.columnName)}"`).join(', ');
-                dbg(`<span class="w">Filter chips not configured on this liveboard — add ${cols} as filter chips in the ThoughtSpot liveboard editor to enable global chip sync. Data IS filtered via runtimeFilters.</span>`);
+                dbg(`<span class="w">UpdateFilters failed: ${escapeHtml(JSON.stringify(e))} — runtimeFilters still active (data is filtered)</span>`);
             }
         });
 
