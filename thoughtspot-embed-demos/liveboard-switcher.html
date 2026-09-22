@@ -480,17 +480,17 @@
                 dbg(`<span class="ok">✔ Filters applied as global chips</span>`);
                 showToast(`${filters.length} filter${filters.length > 1 ? 's' : ''} applied`);
             } catch (e) {
-                const errorType = e?.data?.errorType ?? e?.errorType ?? '';
-                if (errorType === 'NON_EXIST_FILTER') {
-                    const cols = filters.map(f => `"${f.columnName}"`).join(', ');
-                    dbg(`<span class="w">Filter chips not configured on this liveboard — to show global chips, add ${escapeHtml(cols)} as filter chips in the ThoughtSpot liveboard editor. Data IS filtered via runtimeFilters.</span>`);
-                } else {
-                    dbg(`<span class="w">UpdateFilters failed: ${escapeHtml(JSON.stringify(e))} — runtimeFilters still active</span>`);
-                }
+                // UpdateFilters fails when the destination liveboard doesn't have
+                // those columns configured as filter chips in ThoughtSpot.
+                // The NON_EXIST_FILTER SDK errors arrive via EmbedEvent.Error (suppressed below).
+                const cols = filters.map(f => `"${escapeHtml(f.columnName)}"`).join(', ');
+                dbg(`<span class="w">Filter chips not configured on this liveboard — add ${cols} as filter chips in the ThoughtSpot liveboard editor to enable global chip sync. Data IS filtered via runtimeFilters.</span>`);
             }
         });
 
         currentEmbed.on(EmbedEvent.Error, (e) => {
+            // Suppress NON_EXIST_FILTER — already handled in the UpdateFilters catch block
+            if (e?.data?.errorType === 'NON_EXIST_FILTER') return;
             hideLoading();
             dbg(`<span class="w">SDK error: ${escapeHtml(JSON.stringify(e))}</span>`);
         });
