@@ -462,8 +462,11 @@
 
             if (!filters.length) return;
 
-            // Promote runtimeFilters to global filter chips.
-            // UpdateFilters takes column as a plain string name (not an object).
+            // Attempt to promote runtimeFilters to global filter chips.
+            // This only works if the destination liveboard has those columns
+            // configured as filter chips in ThoughtSpot — otherwise the SDK
+            // returns NON_EXIST_FILTER. Either way, runtimeFilters already
+            // ensure the data is filtered correctly.
             try {
                 const payload = {
                     filters: filters.map(f => ({
@@ -474,10 +477,16 @@
                 };
                 dbg(`Promoting to global chips: <span class="v">${escapeHtml(JSON.stringify(payload))}</span>`);
                 await currentEmbed.trigger(HostEvent.UpdateFilters, payload);
-                dbg(`<span class="ok">✔ Filters promoted to global chips</span>`);
+                dbg(`<span class="ok">✔ Filters applied as global chips</span>`);
                 showToast(`${filters.length} filter${filters.length > 1 ? 's' : ''} applied`);
             } catch (e) {
-                dbg(`<span class="w">UpdateFilters failed: ${escapeHtml(String(e))} — runtimeFilters still active (data is filtered)</span>`);
+                const errorType = e?.data?.errorType ?? e?.errorType ?? '';
+                if (errorType === 'NON_EXIST_FILTER') {
+                    const cols = filters.map(f => `"${f.columnName}"`).join(', ');
+                    dbg(`<span class="w">Filter chips not configured on this liveboard — to show global chips, add ${escapeHtml(cols)} as filter chips in the ThoughtSpot liveboard editor. Data IS filtered via runtimeFilters.</span>`);
+                } else {
+                    dbg(`<span class="w">UpdateFilters failed: ${escapeHtml(JSON.stringify(e))} — runtimeFilters still active</span>`);
+                }
             }
         });
 
@@ -532,8 +541,11 @@
     function updateFilterBadge(filters) {
         const badge = document.getElementById('filter-badge');
         if (filters.length) {
-            document.getElementById('filter-badge-text').textContent =
-                `${filters.length} filter${filters.length > 1 ? 's' : ''} carried`;
+            const names = filters.map(f => f.columnName).join(' · ');
+            const detail = filters.map(f => `${f.columnName}: ${f.values.join(', ')}`).join(' | ');
+            const el = document.getElementById('filter-badge-text');
+            el.textContent = names;
+            el.title = detail;
             badge.classList.add('visible');
         } else {
             badge.classList.remove('visible');
