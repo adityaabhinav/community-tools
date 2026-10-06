@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Liveboard CSV Download</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ body{font:15px/1.4 system-ui,sans-serif;margin:0;color:#111;background:#f6f6f6}
+ header{background:#fff;padding:14px 24px;font-weight:700;font-size:18px;box-shadow:0 1px 3px #0001}
+ main{display:grid;grid-template-columns:1fr 360px;gap:24px;max-width:1100px;margin:24px auto;padding:0 16px}
+ .card{background:#fff;border-radius:12px;padding:20px}
+ h2{margin:0 0 12px;font-size:18px}
+ input[type=search],input[type=date],input[type=text]{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font:inherit}
+ .row{display:flex;align-items:center;gap:8px;padding:12px 4px;border-top:1px solid #eee;cursor:pointer}
+ .row:hover{background:#fafafa}.row.sel{background:#fff1ee}
+ .row .n{flex:1}.row small{color:#777}
+ .dl{border:0;background:#eee;border-radius:50%;width:34px;height:34px;cursor:pointer;font-size:16px}
+ .dl:hover{background:#ddd}
+ label{display:block;margin:14px 0 4px;font-weight:600}
+ .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+ button.primary{margin-top:20px;width:100%;padding:12px;border:0;border-radius:24px;background:#111;color:#fff;font:600 15px system-ui;cursor:pointer}
+ button.primary:disabled{opacity:.4;cursor:default}
+ #msg{margin-top:12px;color:#b00020;min-height:1.2em}
+ .hint{color:#777;font-size:13px}
+</style></head><body>
+<header>Liveboard CSV Download</header>
+<main>
+ <section class="card">
+  <h2>1. Choose a liveboard</h2>
+  <input id="q" type="search" placeholder="Search liveboards">
+  <div id="list"></div>
+ </section>
+ <section class="card">
+  <h2>2. Filters</h2>
+  <div id="selected" class="hint">No liveboard selected</div>
+  <label id="dlabel">Date range</label>
+  <div class="two"><input id="from" type="date"><input id="to" type="date"></div>
+  <label id="plabel">Product</label>
+  <input id="products" type="text" placeholder="e.g. Widget, Gadget">
+  <div class="hint">Comma-separated; leave empty for all.</div>
+  <button class="primary" id="go" disabled>Download CSV</button>
+  <div id="msg"></div>
+ </section>
+</main>
+<script>
+let sel=null;
+const $=id=>document.getElementById(id), msg=t=>$('msg').textContent=t||'';
+async function j(u){const r=await fetch(u);const d=await r.json();if(!r.ok)throw new Error(d.error);return d}
+function select(lb){sel=lb;$('selected').textContent='Selected: '+lb.name;$('go').disabled=false;render()}
+function download(lb){
+  select(lb);
+  const p=new URLSearchParams({id:lb.id,from:$('from').value,to:$('to').value,products:$('products').value});
+  msg('');
+  if($('from').value&&$('to').value&&$('from').value>$('to').value)return msg('Start date is after end date.');
+  // Use a navigation so the browser streams the file; errors are probed first.
+  fetch('/api/download?'+p).then(async r=>{
+    if(!r.ok)throw new Error((await r.json()).error);
+    const b=await r.blob(),a=document.createElement('a');
+    a.href=URL.createObjectURL(b);
+    a.download=/filename="(.+)"/.exec(r.headers.get('Content-Disposition')||'')?.[1]||'export.csv';
+    a.click();
+  }).catch(e=>msg(e.message));
+}
+let all=[];
+function render(){
+  $('list').innerHTML='';
+  all.forEach(lb=>{
+    const d=document.createElement('div');d.className='row'+(sel&&sel.id===lb.id?' sel':'');
+    d.innerHTML='<div class="n"></div><button class="dl" title="Download CSV">⬇</button>';
+    d.firstChild.innerHTML='<div></div><small>'+lb.visualizations+' visualizations</small>';
+    d.firstChild.firstChild.textContent=lb.name;
+    d.onclick=()=>select(lb);
+    d.querySelector('button').onclick=e=>{e.stopPropagation();download(lb)};
+    $('list').appendChild(d);
+  });
+}
+async function load(){try{all=await j('/api/liveboards?q='+encodeURIComponent($('q').value));render()}catch(e){msg(e.message)}}
+let t;$('q').oninput=()=>{clearTimeout(t);t=setTimeout(load,250)};
+$('go').onclick=()=>sel&&download(sel);
+j('/api/config').then(c=>{$('dlabel').textContent='Date range ('+c.dateColumn+')';$('plabel').textContent='Product ('+c.productColumn+')'});
+load();
+</script></body></html>
