@@ -113,13 +113,17 @@ def build_filters(date_from, date_to, products):
 
 def download_zip_or_csv(liveboard_id, date_from, date_to, products):
     """Returns (filename, content_type, bytes)."""
+    return download_with_filters(liveboard_id, build_filters(date_from, date_to, products))
+
+
+def download_with_filters(liveboard_id, filters):
+    """filters: list of (column, op, [values]). Returns (filename, content_type, bytes)."""
     if MOCK:
-        csv = f"{DATE_COL},{PRODUCT_COL},Sales\n{date_from or '2026-01-01'},{(products or ['Widget'])[0]},100\n"
-        return "mock.csv", "text/csv", csv.encode()
+        vals = ";".join(v for _, _, vs in filters for v in vs) or "all"
+        return "mock.csv", "text/csv", f"Filters,Sales\n{vals},100\n".encode()
     vizzes = get_visualizations(liveboard_id)
     if not vizzes:
         raise ValueError("Liveboard has no visualizations")
-    filters = build_filters(date_from, date_to, products)
     runtime = {}
     for i, (col, op, vals) in enumerate(filters, 1):
         runtime[f"col{i}"], runtime[f"op{i}"], runtime[f"val{i}"] = col, op, vals

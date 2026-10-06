@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Brand Center</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ :root{--red:#eb1700;--bg:#f7f7f7;--line:#e8e8e8}
+ *{box-sizing:border-box}
+ body{margin:0;font:15px/1.4 system-ui,-apple-system,sans-serif;color:#191919;background:var(--bg)}
+ header{height:56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 20px;gap:10px;font-weight:700;font-size:18px}
+ .logo{color:var(--red);font-size:22px}
+ .shell{display:flex;min-height:calc(100vh - 56px)}
+ nav{width:260px;background:#fff;border-right:1px solid var(--line);padding:16px 12px}
+ nav h3{margin:20px 8px 6px;font-size:12px;color:#777;font-weight:600}
+ nav .brand{padding:8px;font-size:20px;font-weight:700}nav .brand small{display:block;font-size:13px;font-weight:400;color:#555}
+ nav a{display:block;padding:10px 12px;border-radius:8px;color:#333;text-decoration:none;font-weight:500}
+ nav a:hover{background:#f3f3f3}nav a.on{background:#ffeceb;color:var(--red)}
+ main{flex:1;padding:24px 32px;min-width:0}
+ .card{background:#fff;border-radius:16px;padding:24px;margin-bottom:20px}
+ h1{margin:0 0 4px;font-size:30px}h2{font-size:20px;margin:0 0 12px}
+ .sub{color:#666;margin:0 0 20px}
+ #embed{height:calc(100vh - 150px);min-height:500px;border-radius:12px;overflow:hidden;background:#fff}
+ .grid{display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start}
+ .seg{display:flex;flex-direction:column;gap:4px}
+ .opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+ .opt:hover{background:#fafafa}.opt input{accent-color:#111;width:18px;height:18px}
+ .opt small{color:#777;margin-left:auto}
+ label.f{display:block;margin:20px 0 6px;font-weight:600}
+ input[type=text]{width:100%;padding:12px;border:1px solid #d9d9d9;border-radius:10px;font:inherit}
+ .hint{color:#777;font-size:13px;margin-top:6px}
+ .btn{width:100%;margin-top:18px;padding:13px;border:0;border-radius:26px;background:#191919;color:#fff;font:600 15px system-ui;cursor:pointer}
+ .btn:disabled{opacity:.4}
+ .side p{color:#555;font-size:14px}.side li{list-style:none;margin:6px 0}.side ul{padding:0}
+ .ok{color:#1a7f37;font-weight:700}
+ table{width:100%;border-collapse:collapse}th{text-align:left;font-size:14px;padding:10px 8px;border-bottom:1px solid var(--line)}
+ td{padding:14px 8px;border-bottom:1px solid var(--line)}
+ .pill{background:#d7f5df;color:#1a7f37;border-radius:12px;padding:3px 10px;font-size:13px;font-weight:600}
+ .ic{border:0;background:#eee;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:15px}.ic:hover{background:#ddd}
+ #msg{color:#b00020;margin-top:10px;min-height:1.2em}
+ .banner{background:#fff8e1;border:1px solid #ffe08a;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+</style></head><body>
+<header><span class="logo">⟫</span> Brand Center</header>
+<div class="shell">
+ <nav>
+  <div class="brand">[Test] Internal DoorDash 1<small>Consumer brand</small></div>
+  <a href="#home" data-p="home">🏠 Home</a>
+  <h3>Business</h3>
+  <a href="#analytics" data-p="analytics">📈 Analytics</a>
+  <h3>Reports</h3>
+  <a href="#reports" data-p="reports">📄 Download reports</a>
+ </nav>
+ <main>
+  <div id="mockbanner" class="banner" style="display:none">Mock mode: fake data, ThoughtSpot embed is a placeholder.</div>
+  <section id="home" hidden>
+   <h1>Welcome</h1><p class="sub">Explore performance in <b>Analytics</b> or export data from <b>Download reports</b>.</p>
+  </section>
+  <section id="analytics" hidden>
+   <h1>Analytics</h1><p class="sub">Live performance data from ThoughtSpot.</p>
+   <div id="embed"></div>
+  </section>
+  <section id="reports" hidden>
+   <h1>Download report</h1>
+   <p class="sub">Pick a report, filter by country and download it as CSV. No need to open the liveboard.</p>
+   <div class="grid">
+    <div class="card">
+     <h2>① Choose a report</h2>
+     <div class="seg" id="reportList"></div>
+     <h2 style="margin-top:28px">② Filter</h2>
+     <label class="f" id="clabel" for="country">Country</label>
+     <input id="country" type="text" placeholder="e.g. United States, Canada">
+     <div class="hint">Comma-separated. Leave empty for all countries.</div>
+    </div>
+    <div class="card side">
+     <b>Included in your report:</b>
+     <ul><li><span class="ok">✓</span> Every visualization on the selected liveboard</li>
+     <li><span class="ok">✓</span> Your country filter applied</li></ul>
+     <p>Multiple visualizations are downloaded as a ZIP of CSV files.</p>
+     <button class="btn" id="go" disabled>Download CSV</button>
+     <div id="msg"></div>
+    </div>
+   </div>
+   <div class="card">
+    <h2>Report history</h2>
+    <table><thead><tr><th>Name</th><th>Country</th><th>Date generated</th><th>Status</th><th></th></tr></thead>
+    <tbody id="hist"><tr><td colspan="5" style="color:#777">No reports downloaded yet.</td></tr></tbody></table>
+   </div>
+  </section>
+ </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@thoughtspot/visual-embed-sdk/dist/tsembed.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let cfg, reports=[], sel=null, embedded=false, hist=JSON.parse(localStorage.getItem('hist')||'[]');
+async function j(u){const r=await fetch(u);const d=await r.json();if(!r.ok)throw new Error(d.error);return d}
+
+function route(){
+  const p=(location.hash||'#home').slice(1);
+  document.querySelectorAll('section').forEach(s=>s.hidden=s.id!==p);
+  document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',a.dataset.p===p));
+  if(p==='analytics')loadEmbed();
+}
+window.onhashchange=route;
+
+async function loadEmbed(){
+  if(embedded||!cfg)return; embedded=true;
+  if(cfg.mock){$('embed').innerHTML='<p style="padding:24px;color:#777">Liveboard '+cfg.analyticsLiveboard+' renders here.</p>';return}
+  try{
+    const {init,AuthType,LiveboardEmbed}=window.tsembed;
+    init({thoughtSpotHost:cfg.host,authType:AuthType.TrustedAuthTokenCookieless,
+          getAuthToken:async()=>(await j('/api/embed-token')).token});
+    new LiveboardEmbed($('embed'),{frameParams:{width:'100%',height:'100%'},liveboardId:cfg.analyticsLiveboard}).render();
+  }catch(e){embedded=false;$('embed').textContent=e.message}
+}
+
+function renderReports(){
+  $('reportList').innerHTML='';
+  reports.forEach(r=>{
+    const l=document.createElement('label');l.className='opt';
+    l.innerHTML='<input type="radio" name="rep"><span></span><small></small>';
+    l.querySelector('span').textContent=r.name;
+    l.querySelector('small').textContent=r.visualizations+' visualization'+(r.visualizations>1?'s':'');
+    l.querySelector('input').onchange=()=>{sel=r;$('go').disabled=false};
+    $('reportList').appendChild(l);
+  });
+}
+
+function renderHist(){
+  if(!hist.length)return;
+  $('hist').innerHTML='';
+  hist.forEach(h=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td></td><td></td><td></td><td><span class="pill">Available</span></td><td><button class="ic" title="Download again">⬇</button></td>';
+    const c=tr.children;c[0].textContent=h.name;c[1].textContent=h.countries||'All';c[2].textContent=h.date;
+    c[4].firstChild.onclick=()=>download(h.id,h.name,h.countries,true);
+    $('hist').appendChild(tr);
+  });
+}
+
+async function download(id,name,countries,again){
+  $('msg').textContent='';
+  try{
+    const r=await fetch('/api/download?'+new URLSearchParams({id,countries}));
+    if(!r.ok)throw new Error((await r.json()).error);
+    const b=await r.blob(),a=document.createElement('a');
+    a.href=URL.createObjectURL(b);
+    a.download=/filename="(.+)"/.exec(r.headers.get('Content-Disposition')||'')?.[1]||'report.csv';
+    a.click();
+    if(!again){
+      hist.unshift({id,name,countries,date:new Date().toLocaleDateString()});
+      hist=hist.slice(0,20);localStorage.setItem('hist',JSON.stringify(hist));renderHist();
+    }
+  }catch(e){$('msg').textContent=e.message}
+}
+$('go').onclick=()=>sel&&download(sel.id,sel.name,$('country').value.trim());
+
+(async()=>{
+  try{
+    cfg=await j('/api/config');
+    $('clabel').textContent='Country ('+cfg.countryColumn+')';
+    $('mockbanner').style.display=cfg.mock?'block':'none';
+    reports=await j('/api/reports');renderReports();renderHist();
+  }catch(e){$('msg').textContent=e.message}
+  route();
+})();
+</script></body></html>
