@@ -5,7 +5,7 @@ ThoughtSpot Visual Embed SDK.
 
 ## Run
 
-1. Set `thoughtSpotHost` in `config.js`.
+1. `thoughtSpotHost` in `config.js` is set to `https://ps-internal.thoughtspot.cloud`.
 2. Add your app's origin to the ThoughtSpot CSP and CORS allowlists (Develop > Security settings).
 3. Serve the folder and open it while logged in to ThoughtSpot in the same browser:
 
