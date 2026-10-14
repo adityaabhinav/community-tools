@@ -14,7 +14,7 @@ async function main() {
     return;
   }
 
-  const { init, AuthType, LiveboardEmbed, EmbedEvent } = await import(SDK_URL);
+  const { init, AuthType, Action, LiveboardEmbed, EmbedEvent } = await import(SDK_URL);
 
   // AuthType.None relies on the user already being logged in to ThoughtSpot in
   // this browser. Switch to SSO or trusted auth for production.
@@ -23,20 +23,31 @@ async function main() {
     authType: AuthType.None,
   });
 
-  const embed = new LiveboardEmbed("#ts-embed", {
-    frameParams: { width: "100%", height: "100%" },
-    liveboardId: config.liveboardId,
+  const grid = document.getElementById("viz-grid");
 
-    // Lets filters be scoped to a group of visualizations (SDK 1.53.0+,
-    // ThoughtSpot 26.10.0.cl+). In the liveboard, scope the filter to
-    // the 4th viz only so vizzes 1-3 are not affected.
-    isScopedLiveboardFilteringEnabled: true,
-    isLiveboardCompactHeaderEnabled: true,
-  });
+  for (const viz of config.vizzes) {
+    const card = document.createElement("section");
+    card.className = "card";
+    const title = document.createElement("h2");
+    title.textContent = viz.title;
+    const container = document.createElement("div");
+    container.className = "viz";
+    card.append(title, container);
+    grid.append(card);
 
-  embed.on(EmbedEvent.Error, (e) => showError(`Embed error: ${JSON.stringify(e)}`));
-  embed.on(EmbedEvent.AuthExpire, () => showError("Session expired. Log in to ThoughtSpot and reload."));
-  await embed.render();
+    const embed = new LiveboardEmbed(container, {
+      frameParams: { width: "100%", height: "100%" },
+      liveboardId: config.liveboardId,
+      vizId: viz.id,
+      // hiddenActions removes the item from the menu (disabledActions would grey it out).
+      // It applies per embed, which is why each viz has its own embed.
+      hiddenActions: viz.showFilter ? [] : [Action.CrossFilter],
+    });
+
+    embed.on(EmbedEvent.Error, (e) => showError(`Embed error: ${JSON.stringify(e)}`));
+    embed.on(EmbedEvent.AuthExpire, () => showError("Session expired. Log in to ThoughtSpot and reload."));
+    embed.render();
+  }
 }
 
 main().catch((e) => showError(`Failed to start: ${e && e.message ? e.message : e}`));

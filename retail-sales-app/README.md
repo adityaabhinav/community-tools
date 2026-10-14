@@ -13,21 +13,14 @@ ThoughtSpot Visual Embed SDK.
    cd retail-sales-app && python3 -m http.server 8080
    ```
 
-## Filter only on the 4th viz
+## Filter action per viz
 
-Liveboard filters apply to all vizzes by default. The embed sets
-`isScopedLiveboardFilteringEnabled: true`, which lets a filter be scoped to a group of vizzes.
-One-time setup in the liveboard itself (as an editor):
+The right-click **Filter** item on a viz is `Action.CrossFilter`. The SDK's `hiddenActions`
+applies to a whole embed, so this app embeds each viz separately (`vizId`) and sets
+`hiddenActions: [Action.CrossFilter]` on the ones that should not offer it. Hidden removes the
+item completely; `disabledActions` would only grey it out.
 
-1. Edit the liveboard and add a filter (e.g. Zip Code, Date or Product).
-2. Scope it to the 4th (untitled) viz only. Leave out:
-   - Total Sales Amt by Zip Code
-   - Total sales by Monthly date
-   - Total quantity purchased by Monthly date
-3. Save. Vizzes 1-3 are unaffected when users change the filter.
+Edit `vizzes` in `config.js` and set `showFilter: true/false` per viz. Currently only the 4th viz
+keeps the Filter action.
 
-The scoping is stored in the liveboard, not in this app's code. The SDK's
-`hiddenActions` / `disabledActions` apply to the whole embed, so they cannot hide the
-filter action on individual vizzes.
-
-Requires SDK 1.53.0+ and ThoughtSpot 26.10.0.cl+ (your cluster is 26.11.0.cl).
+Note: each viz is a separate embed, so cross-filters do not carry from one viz to another.
