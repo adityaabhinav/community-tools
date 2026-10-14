@@ -26,8 +26,10 @@ async function main() {
   const grid = document.getElementById("viz-grid");
 
   const rule = new URLSearchParams(location.search).get("rule") || config.filterRule;
-  const keepsFilter = (viz) =>
-    rule === "vizId" ? config.filterVizIds.includes(viz.id) : viz.showFilter;
+  const keepsFilter = (viz) => {
+    if (config.hideCrossFilterEverywhere) return false;
+    return rule === "vizId" ? config.filterVizIds.includes(viz.id) : viz.showFilter;
+  };
   document.title = `Retail Sales (rule: ${rule})`;
 
   for (const viz of config.vizzes) {

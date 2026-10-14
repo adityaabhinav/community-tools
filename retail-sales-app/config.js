@@ -6,6 +6,10 @@ export const config = {
 
   // Each viz is embedded on its own so the right-click "Filter" action
   // (Action.CrossFilter) can be removed per viz. Set showFilter: true to keep it.
+  // true = remove the right-click Filter (cross filter) action on every viz,
+  // regardless of the rule below.
+  hideCrossFilterEverywhere: true,
+
   // How to decide which vizzes keep the Filter action. Override in the URL with
   // ?rule=flag or ?rule=vizId.
   //   "flag"  - use each viz's showFilter below
