@@ -29,7 +29,7 @@ async function main() {
 
     // Lets filters be scoped to a group of visualizations (SDK 1.53.0+,
     // ThoughtSpot 26.10.0.cl+). In the liveboard, scope the filter to
-    // viz 2-4 so "Total Sales Amt by Zip Code" (viz 1) is not affected.
+    // the 4th viz only so vizzes 1-3 are not affected.
     isScopedLiveboardFilteringEnabled: true,
     isLiveboardCompactHeaderEnabled: true,
   });

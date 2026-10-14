@@ -13,17 +13,21 @@ ThoughtSpot Visual Embed SDK.
    cd retail-sales-app && python3 -m http.server 8080
    ```
 
-## Filters on every viz except the first
+## Filter only on the 4th viz
 
 Liveboard filters apply to all vizzes by default. The embed sets
 `isScopedLiveboardFilteringEnabled: true`, which lets a filter be scoped to a group of vizzes.
 One-time setup in the liveboard itself (as an editor):
 
 1. Edit the liveboard and add a filter (e.g. Zip Code, Date or Product).
-2. Scope it to the vizzes below, leaving out the first one:
+2. Scope it to the 4th (untitled) viz only. Leave out:
+   - Total Sales Amt by Zip Code
    - Total sales by Monthly date
    - Total quantity purchased by Monthly date
-   - the untitled fourth viz
-3. Save. "Total Sales Amt by Zip Code" is unaffected when users change the filter.
+3. Save. Vizzes 1-3 are unaffected when users change the filter.
+
+The scoping is stored in the liveboard, not in this app's code. The SDK's
+`hiddenActions` / `disabledActions` apply to the whole embed, so they cannot hide the
+filter action on individual vizzes.
 
 Requires SDK 1.53.0+ and ThoughtSpot 26.10.0.cl+ (your cluster is 26.11.0.cl).
