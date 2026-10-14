@@ -20,7 +20,12 @@ applies to a whole embed, so this app embeds each viz separately (`vizId`) and s
 `hiddenActions: [Action.CrossFilter]` on the ones that should not offer it. Hidden removes the
 item completely; `disabledActions` would only grey it out.
 
-Edit `vizzes` in `config.js` and set `showFilter: true/false` per viz. Currently only the 4th viz
+Two ways to choose which vizzes keep it, set by `filterRule` in `config.js` or the URL:
+
+- `http://localhost:8080/?rule=flag` uses `showFilter` on each viz in `vizzes`.
+- `http://localhost:8080/?rule=vizId` keeps it only for the ids in `filterVizIds`.
+
+Both give the same result today; the tab title shows which rule is active. Currently only the 4th viz
 keeps the Filter action.
 
 Note: each viz is a separate embed, so cross-filters do not carry from one viz to another.

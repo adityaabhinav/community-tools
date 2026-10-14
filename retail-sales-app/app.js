@@ -25,6 +25,11 @@ async function main() {
 
   const grid = document.getElementById("viz-grid");
 
+  const rule = new URLSearchParams(location.search).get("rule") || config.filterRule;
+  const keepsFilter = (viz) =>
+    rule === "vizId" ? config.filterVizIds.includes(viz.id) : viz.showFilter;
+  document.title = `Retail Sales (rule: ${rule})`;
+
   for (const viz of config.vizzes) {
     const card = document.createElement("section");
     card.className = "card";
@@ -41,7 +46,7 @@ async function main() {
       vizId: viz.id,
       // hiddenActions removes the item from the menu (disabledActions would grey it out).
       // It applies per embed, which is why each viz has its own embed.
-      hiddenActions: viz.showFilter ? [] : [Action.CrossFilter],
+      hiddenActions: keepsFilter(viz) ? [] : [Action.CrossFilter],
     });
 
     embed.on(EmbedEvent.Error, (e) => showError(`Embed error: ${JSON.stringify(e)}`));
