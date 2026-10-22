@@ -1,11 +1,25 @@
 /* Loaded INSIDE the ThoughtSpot iframe via customizations.style.customCSSUrl.
    DoorDash uses the proprietary "TT Norms Pro"; DM Sans is a close free substitute.
-   To use the real font, add an @font-face for it here and put it first in --dd-font. */
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap");
+   Declared with @font-face (fonts.gstatic.com is allowed by default on ThoughtSpot instances).
+   To use the real font, add its @font-face here and list it first in font-family. */
+@font-face {
+  font-family: 'DM Sans'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url(https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAopxhTg.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'DM Sans'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url(https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAkJxhTg.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'DM Sans'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url(https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwARZthTg.ttf) format('truetype');
+}
 
 :root {
-  --dd-font: "DM Sans", "TT Norms Pro", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --ts-var-root-font-family: "DM Sans", "TT Norms Pro", -apple-system, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* Make every text node in the liveboard use the DoorDash-style font */
-body, button, input, select, textarea { font-family: var(--dd-font) !important; }
+body, button, input, select, textarea {
+  font-family: "DM Sans", "TT Norms Pro", -apple-system, "Helvetica Neue", Arial, sans-serif !important;
+}
