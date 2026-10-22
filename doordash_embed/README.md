@@ -6,6 +6,7 @@ Static demo app embedding a ThoughtSpot Liveboard in a DoorDash-merchant-portal-
 - `index.html` / `app.css` – host page shell
 - `app.js` – Visual Embed SDK `init()` + `LiveboardEmbed`, with font/colour CSS variables
 - `liveboard-theme.css` – DoorDash-style CSS loaded inside the iframe (font import + global font override)
+- `liveboard-theme-roo.css` / `liveboard-theme-wolt.css` – Deliveroo-/Wolt-style stylesheets (full @font-face coverage)
 - `liveboard-theme-facebook.css` – Facebook-style (system UI font stack) CSS loaded inside the iframe
 
 ## Run
@@ -24,7 +25,8 @@ Two liveboards, each with its own theme, selected by tab (or `?view=doordash` / 
 | Tab | Liveboard | Font |
 |---|---|---|
 | Merchant Insights | `8930f905-38c0-4de3-b6ea-68bd9e275d93` | DM Sans (DoorDash-like) |
-| Social Insights | `5a328046-8a29-4c11-ad85-52cfdf685005` | system UI stack (Facebook-like) |
+| DD / ROO / WOLT tabs | ROO and WOLT currently reuse the second liveboard until real IDs are set in `app.js` | Outfit / Nunito stand-ins |
+| Facebook | `5a328046-8a29-4c11-ad85-52cfdf685005` | system UI stack (Facebook-like) |
 
 ## Fonts
 DoorDash's TT Norms Pro is proprietary; DM Sans is used as a close free stand-in. Swap the font

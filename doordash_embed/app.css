@@ -38,3 +38,11 @@ body[data-theme="facebook"] { --dd-font: system-ui, -apple-system, "Segoe UI", R
 body[data-theme="facebook"] .brand, body[data-theme="facebook"] .avatar { color: #1877f2; }
 body[data-theme="facebook"] .avatar { background: #1877f2; color: #fff; }
 body[data-theme="facebook"] nav a.active { background: #1877f2; }
+
+/* ROO / WOLT: host-shell fonts and accents */
+body[data-theme="roo"] { --dd-font: "Outfit", -apple-system, "Helvetica Neue", Arial, sans-serif; }
+body[data-theme="roo"] .brand, body[data-theme="roo"] .avatar { color: #00ccbc; }
+body[data-theme="roo"] .avatar, body[data-theme="roo"] nav a.active { background: #00ccbc; color: #fff; }
+body[data-theme="wolt"] { --dd-font: "Nunito", -apple-system, "Helvetica Neue", Arial, sans-serif; }
+body[data-theme="wolt"] .brand { color: #009de0; }
+body[data-theme="wolt"] .avatar, body[data-theme="wolt"] nav a.active { background: #009de0; color: #fff; }

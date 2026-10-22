@@ -6,6 +6,9 @@ const TS_HOST = "https://ps-internal.thoughtspot.cloud";
 
 // DoorDash uses proprietary "TT Norms Pro"; DM Sans is a close free stand-in.
 const DOORDASH_FONT = `"DM Sans", "TT Norms Pro", -apple-system, "Helvetica Neue", Arial, sans-serif`;
+// Stand-ins for Deliveroo (ROO) and Wolt; replace with the licensed brand fonts in each theme CSS.
+const ROO_FONT = `"Outfit", "Roobert", -apple-system, "Helvetica Neue", Arial, sans-serif`;
+const WOLT_FONT = `"Nunito", "Omnes", -apple-system, "Helvetica Neue", Arial, sans-serif`;
 // Facebook uses the system UI font stack (SF Pro on Apple, Segoe UI on Windows, Roboto on Android).
 const FACEBOOK_FONT = `system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
 
@@ -50,6 +53,25 @@ const VIEWS = {
     variables: {
       ...themeVariables(DOORDASH_FONT, "#eb1700", "#c01300", "#a01000", "#f7f7f7"),
       "--ts-var-viz-border-radius": "16px",
+      "--ts-var-liveboard-tab-border-radius": "999px",
+    },
+  },
+  // TODO: set the real liveboard IDs for ROO and WOLT (currently reuse the second liveboard).
+  roo: {
+    liveboardId: "5a328046-8a29-4c11-ad85-52cfdf685005",
+    cssFile: "liveboard-theme-roo.css",
+    variables: {
+      ...themeVariables(ROO_FONT, "#00ccbc", "#00b3a5", "#009a8e", "#f9fafa"),
+      "--ts-var-viz-border-radius": "12px",
+      "--ts-var-liveboard-tab-border-radius": "999px",
+    },
+  },
+  wolt: {
+    liveboardId: "5a328046-8a29-4c11-ad85-52cfdf685005",
+    cssFile: "liveboard-theme-wolt.css",
+    variables: {
+      ...themeVariables(WOLT_FONT, "#009de0", "#008ac7", "#0077ae", "#f5f7f9"),
+      "--ts-var-viz-border-radius": "12px",
       "--ts-var-liveboard-tab-border-radius": "999px",
     },
   },
