@@ -1,0 +1,5 @@
+/* Loaded INSIDE the ThoughtSpot iframe via customizations.style.customCSSUrl.
+   Facebook uses the platform's system UI font (SF Pro / Segoe UI / Roboto), so no web font is needed. */
+body, button, input, select, textarea {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}

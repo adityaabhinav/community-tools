@@ -32,3 +32,9 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px; }
 .status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dd-muted); pointer-events: none; }
 .status.hidden { display: none; }
 .status.error { color: var(--dd-red); padding: 24px; text-align: center; }
+
+/* Facebook tab: system font + Facebook blue */
+body[data-theme="facebook"] { --dd-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --dd-bg: #f0f2f5; }
+body[data-theme="facebook"] .brand, body[data-theme="facebook"] .avatar { color: #1877f2; }
+body[data-theme="facebook"] .avatar { background: #1877f2; color: #fff; }
+body[data-theme="facebook"] nav a.active { background: #1877f2; }
