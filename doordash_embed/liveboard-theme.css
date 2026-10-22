@@ -1,0 +1,11 @@
+/* Loaded INSIDE the ThoughtSpot iframe via customizations.style.customCSSUrl.
+   DoorDash uses the proprietary "TT Norms Pro"; DM Sans is a close free substitute.
+   To use the real font, add an @font-face for it here and put it first in --dd-font. */
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap");
+
+:root {
+  --dd-font: "DM Sans", "TT Norms Pro", -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Make every text node in the liveboard use the DoorDash-style font */
+body, button, input, select, textarea { font-family: var(--dd-font) !important; }

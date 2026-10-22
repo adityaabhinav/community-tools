@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DoorDash Merchant Insights</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">&#9654;</span> DoorDash <span class="sub">for Merchants</span></div>
+    <nav>
+      <a href="#" class="active">Insights</a>
+      <a href="#">Orders</a>
+      <a href="#">Menu</a>
+      <a href="#">Payouts</a>
+    </nav>
+    <div class="avatar">A</div>
+  </header>
+
+  <main>
+    <div class="page-head">
+      <h1>Insights</h1>
+      <p>Track sales, orders and customer trends across your stores.</p>
+    </div>
+    <section class="card">
+      <div id="ts-embed"></div>
+      <div id="status" class="status">Loading your insights&hellip;</div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
